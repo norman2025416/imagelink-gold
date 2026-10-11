@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="theme-color" content="#01060C">
-<meta name="ig-build" content="2026-10-11 15:38">
+<meta name="ig-build" content="2026-10-11 15:46">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -193,11 +193,15 @@ th{font-weight:500;text-align:left;color:var(--txt3);padding:8px 10px;background
 .foot{font-size:13px;color:var(--txt3)}
 
 /* boot overlay + dialog */
-#boot{position:fixed;inset:0;z-index:20;background:rgba(1,6,12,.94);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:22px;padding:24px;text-align:center}
+#boot{position:fixed;inset:0;z-index:20;background:#01060C;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:22px;padding:24px;text-align:center}
 #boot[hidden]{display:none}
 #boot b{font-family:var(--disp);font-weight:800;font-size:clamp(28px,6vw,48px);letter-spacing:.3em;color:#fff;text-shadow:0 0 20px rgba(79,209,255,.8)}
 #boot p{margin:0;max-width:520px;color:var(--txt2)}
 #boot .btn{min-height:56px;padding:0 34px;font-size:17px}
+.pinrow{display:flex;flex-direction:column;gap:6px;align-items:center}
+.pinrow label{font-family:var(--mono);font-size:12px;letter-spacing:.3em;color:var(--blue2)}
+.pinrow input{width:min(260px,80vw);min-height:54px;text-align:center;font-family:var(--disp);font-size:22px;letter-spacing:.3em;background:#031220;border:1px solid var(--blue);color:#fff}
+#boot .pinmsg{min-height:22px;color:var(--down);font-weight:600}
 dialog{background:#031220;color:var(--txt);border:1px solid var(--blue);padding:20px;max-width:min(520px,92vw);width:100%}
 dialog::backdrop{background:rgba(1,6,12,.8)}
 dialog .dform{display:flex;flex-direction:column;gap:14px} .dhead{display:flex;align-items:center;justify-content:space-between;gap:10px} dialog{max-height:92vh;overflow-y:auto} dialog h2{margin:0;font-family:var(--disp);letter-spacing:.2em;font-size:16px;color:var(--blue2)}
@@ -227,8 +231,14 @@ fieldset.alerts .btn{align-self:flex-start;margin-top:6px}
 <body>
 <div id="boot">
   <b>IMAGELINK</b>
-  <p>Gold intelligence system. Press start to switch on the live data and the voice.</p>
+  <p id="bootLead">Gold intelligence system. Enter your PIN to start.</p>
+  <div class="pinrow" id="pinRow">
+    <label for="pinIn">PIN</label>
+    <input id="pinIn" type="password" autocomplete="off" autocapitalize="characters" spellcheck="false" maxlength="24">
+  </div>
   <button class="btn solid" id="bootBtn" type="button">START SYSTEM</button>
+  <p class="pinmsg" id="pinMsg" role="alert" aria-live="assertive"></p>
+  <p id="pinHelp">Contact the admin for the PIN: <a href="mailto:Norman@imagelink.co.za">Norman@imagelink.co.za</a></p>
   <p class="foot">Analysis only. This page does not place trades and is not financial advice.</p>
 </div>
 
@@ -1772,11 +1782,37 @@ if (typeof module !== 'undefined') module.exports = IG;
     LS.set('ig_cfg', CFG); closeDlg(); render();
   });
   $('clearLog').addEventListener('click', function () { CALLS = CALLS.filter(function (c) { return c.stage === 'setup' || c.stage === 'live' || c.stage === 'tp1'; }); saveCalls(); renderLog(); });
+  /* PIN gate. The page holds only a slow one-way hash of the PIN, never the PIN itself. This keeps casual visitors
+     out; it is not strong protection, because the page and its code are public. */
+  var PIN_SALT = 'ig-ad3167e6353c61aa', PIN_HASH = '9bf262b7198fef368d550cb473299102bae6870b40fab2949a4fabe1122d54e2', PIN_IT = 200000, pinFails = 0, pinWait = 0, pinBusy = false;
+  function sessOK() { try { return sessionStorage.getItem('ig_ok') === PIN_HASH.slice(0, 16); } catch (e) { return false; } }
+  function pinCheck(pin) {
+    if (!(window.crypto && crypto.subtle && window.TextEncoder)) return Promise.reject(new Error('nocrypto'));
+    var enc = new TextEncoder();
+    return crypto.subtle.importKey('raw', enc.encode(String(pin).trim().toUpperCase()), 'PBKDF2', false, ['deriveBits'])
+      .then(function (k) { return crypto.subtle.deriveBits({ name: 'PBKDF2', salt: enc.encode(PIN_SALT), iterations: PIN_IT, hash: 'SHA-256' }, k, 256); })
+      .then(function (buf) { var v = new Uint8Array(buf), h = ''; for (var i = 0; i < v.length; i++) h += ('0' + v[i].toString(16)).slice(-2); return h === PIN_HASH; });
+  }
+  if (sessOK()) { $('pinRow').hidden = true; $('pinHelp').hidden = true; setTxt('bootLead', 'Gold intelligence system. Press start to switch on the live data and the voice.'); }
+  $('pinIn').addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); $('bootBtn').click(); } });
   $('bootBtn').addEventListener('click', function () {
+    if (booted || pinBusy) return;
+    if (sessOK()) { bootNow(); return; }
+    if (Date.now() < pinWait) { setTxt('pinMsg', 'Too many wrong tries. Wait ' + Math.ceil((pinWait - Date.now()) / 1000) + ' seconds.'); return; }
+    var pin = $('pinIn').value; if (!pin.trim()) { setTxt('pinMsg', 'Enter the PIN.'); return; }
+    pinBusy = true; setTxt('pinMsg', '');
+    pinCheck(pin).then(function (ok) {
+      pinBusy = false;
+      if (!ok) { pinFails++; $('pinIn').value = ''; if (pinFails >= 5) { pinWait = Date.now() + 30000; pinFails = 0; } setTxt('pinMsg', 'Wrong PIN.'); return; }
+      try { sessionStorage.setItem('ig_ok', PIN_HASH.slice(0, 16)); } catch (e) { /* asks again next time */ }
+      $('pinIn').value = ''; bootNow();
+    }).catch(function () { pinBusy = false; setTxt('pinMsg', 'This viewer cannot check the PIN. Open the page in Chrome or Safari from its web address.'); });
+  });
+  function bootNow() {
     booted = true; $('boot').hidden = true;
     var an = S[active].an; say(greet() + ' ' + (an && an.ok ? marketLine(active) : 'I am still loading the market data.') + (newsOK && !verdict(active).closed ? ' ' + newsLine() : ''));
     lastKey = ''; announce(false);
-  });
+  }
   window.addEventListener('resize', drawChart);
   $('pipe').addEventListener('click', function (e) {
     var t = e.target; while (t && t !== this && !(t.getAttribute && t.getAttribute('data-go'))) t = t.parentNode;
