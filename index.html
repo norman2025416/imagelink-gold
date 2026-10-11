@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="theme-color" content="#01060C">
-<meta name="ig-build" content="2026-10-11 16:18">
+<meta name="ig-build" content="2026-10-11 18:38">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -283,7 +283,7 @@ table.bt td.up{color:var(--up)} table.bt td.down{color:var(--down)}
         <div class="ph"><h2>MARKETS</h2><i></i><span>LIVE</span></div>
         <div id="markets"></div>
         <div class="alert" id="leadAlert" hidden><small>ALERT</small><span id="leadTxt"></span></div>
-        <div class="note" id="mkNote">Change is over the last 30 minutes this page has been open.</div>
+        <div class="note" id="mkNote">Change is over the last 30 minutes this page has been open. Gold and Bitcoin stream live while the DATA light says LIVE. A phone pauses every web page when it locks or you switch apps; this page catches up the moment you return.</div>
       </section>
       <section class="panel">
         <div class="ph"><h2>TREND</h2><i></i><span id="trendTag"></span></div>
@@ -440,6 +440,7 @@ table.bt td.up{color:var(--up)} table.bt td.down{color:var(--down)}
       <label class="chk"><input id="fPing" type="checkbox"> Play a short ping sound</label>
       <label class="chk"><input id="fVoice" type="checkbox"> Speak it aloud (voice)</label>
       <label class="chk"><input id="fDesk" type="checkbox"> Also notify me on the computer when this tab is in the background</label>
+      <label class="chk"><input id="fAwake" type="checkbox"> Keep the screen awake while this page is open (uses more battery)</label>
       <button class="btn" type="button" id="testBtn">TEST ALERT</button>
     </fieldset>
     <div class="field"><label for="fBroker">YOUR BROKER'S GOLD PRICE RIGHT NOW (OPTIONAL)</label><input id="fBroker" type="text" inputmode="decimal" placeholder="Lines up the levels with your broker"></div>
@@ -963,6 +964,7 @@ if (typeof module !== 'undefined') module.exports = IG;
   if (CFG.pop === undefined) CFG.pop = true;
   if (CFG.ping === undefined) CFG.ping = true;
   if (CFG.desk === undefined) CFG.desk = false;
+  if (CFG.awake === undefined) CFG.awake = false;
   if (!CFG.model) CFG.model = 'claude-sonnet-5-5';
   if (!CFG.brokerOff) CFG.brokerOff = {};
   if (!CFG.key) CFG.key = '';
@@ -976,7 +978,7 @@ if (typeof module !== 'undefined') module.exports = IG;
   var S = {}, SPOT = {}, HIST = {}, NEWS = [], newsOK = false, CALLS = LS.get('ig_calls', []);
   var active = SYMS[CFG.sym] ? CFG.sym : 'GOLD', booted = false, lastSpoken = '', lastKey = '';
   var T0 = Date.now();
-  Object.keys(SYMS).forEach(function (k) { S[k] = { raw: null, tf: null, an: null, demo: false, off: 0, mode: '', tK: 0, tStep: 0, loading: false, bt: null, tBT: 0, full: null, btL: LS.get('ig_btl_' + k, null), btRun: null, btErr: '' }; });
+  Object.keys(SYMS).forEach(function (k) { S[k] = { raw: null, tf: null, an: null, demo: false, off: 0, mode: '', tK: 0, tStep: 0, loading: false, tLive: 0, tkHi: null, tkLo: null, spT: 0, bt: null, tBT: 0, full: null, btL: LS.get('ig_btl_' + k, null), btRun: null, btErr: '' }; });
   var TYPES = { retest: 'break and retest', sweep: 'sweep and reclaim', orb: 'opening-range breakout' }, LONG_DAYS = 180;
 
   /* ---------- helpers ---------- */
@@ -1179,14 +1181,15 @@ if (typeof module !== 'undefined') module.exports = IG;
       var closed = !marketOpen(id);
       if (st.mode === 'spot' && closed && st.ci && sp && Math.abs(sp.p - st.ci.close) / sp.p < 0.03) {
         st.off = sp.p - st.ci.close; st.offSet = true;                                                    // spot is frozen at Friday's close; anchor the feed to it
-      } else if (st.mode === 'spot' && !closed && live && Math.abs(sp.p - last) / last < 0.03) {
+      } else if (st.mode === 'spot' && !closed && live && sp.t !== st.spT && Math.abs(sp.p - last) / last < 0.03) {
+        st.spT = sp.t;                                                                                   // once per spot sample, so a fast stream does not drag the offset
         st.off = st.offSet ? st.off * 0.85 + (sp.p - last) * 0.15 : sp.p - last; st.offSet = true;       // smoothed so the levels do not wobble
       }
     }
     off = st.off;
     function sh(c) { return c.map(function (x) { return { t: x.t, o: x.o + off, h: x.h + off, l: x.l + off, c: x.c + off }; }); }
     var out = { m5: sh(raw.m5), m15: sh(raw.m15), h1: sh(raw.h1), d1: sh(raw.d1 || []) };
-    if (st.mode === 'spot' && live && marketOpen(id)) { var f = out.m5[out.m5.length - 1]; f.c = sp.p; if (sp.p > f.h) f.h = sp.p; if (sp.p < f.l) f.l = sp.p; }   // the candle still forming ends at the live price
+    if (st.mode === 'spot' && live && marketOpen(id) && !streaming(id)) { var f = out.m5[out.m5.length - 1]; f.c = sp.p; if (sp.p > f.h) f.h = sp.p; if (sp.p < f.l) f.l = sp.p; }   // the candle still forming ends at the live price
     return out;
   }
   function newsMinutes() {
@@ -1312,10 +1315,15 @@ if (typeof module !== 'undefined') module.exports = IG;
     return null;
   }
   function lastCall(id) { for (var i = CALLS.length - 1; i >= 0; i--) if (CALLS[i].sym === id) return CALLS[i]; return null; }
-  function stepCalls(id, hi, lo, barT) {
+  function stepCalls(id, hi, lo, barT, at, tickBar) {
     var c = activeCall(id); if (!c) return;
-    var before = c.stage;
-    IG.stepCall(c, hi, lo, Date.now(), barT === undefined ? null : barT);
+    var before = c.stage, tick = barT === undefined || barT === null, now = at || Date.now();
+    IG.stepCall(c, hi, lo, now, tick ? null : barT);
+    if (tick && c.stage !== before) {                      // a live sample: remember its candle, so the whole-candle pass cannot count a high or low from before this moment
+      var m5 = S[id].raw && S[id].raw.m5, cur = tickBar || (m5 && m5.length ? m5[m5.length - 1].t : Math.floor(now / 300000) * 300000);   // the candle this sample belongs to
+      if (before === 'setup') c.fillBar = cur;
+      if (c.stage === 'tp1' || (before !== 'tp1' && c.tTP1)) c.tp1Bar = cur;
+    }
     if (c.stage !== before) { logEv(SYMS[id].label + ' call: ' + ({ live: 'entry reached', tp1: 'TP1 hit', done: c.result === 'win2' ? 'TP2 hit, complete' : 'runner closed at entry', stopped: 'stopped out', expired: 'expired, no entry' }[c.stage] || c.stage), c.stage === 'stopped' ? 'down' : c.stage === 'expired' ? 'dim' : 'up');
       saveCalls(); if (id === active) announce(true); else if (booted && !c.demo && c.stage !== 'cancelled') alertUser(id, verdict(id)); }
   }
@@ -1336,7 +1344,8 @@ if (typeof module !== 'undefined') module.exports = IG;
     var m5 = st.tf.m5, lastC = m5[m5.length - 1];
     st.an = IG.analyse(st.tf, { newsMin: newsMinutes(), peersDir: peersDir(id) });
     var ac = activeCall(id);                             // only candles that opened after the call was made can move it
-    for (var i = Math.max(0, m5.length - 6); i < m5.length; i++) if (ac && m5[i].t >= st.tStep && m5[i].t >= ac.t) stepCalls(id, m5[i].h, m5[i].l, m5[i].t);
+    var nowT = Date.now();                               // every candle since the last pass, so a page that slept catches up in order and at the right times
+    for (var i = 0; i < m5.length; i++) if (ac && m5[i].t >= st.tStep && m5[i].t >= ac.t) stepCalls(id, m5[i].h, m5[i].l, m5[i].t, Math.min(nowT, m5[i].t + 299999));
     st.tStep = lastC.t;
     manage(id);
     if (id === active) render();
@@ -1414,7 +1423,7 @@ if (typeof module !== 'undefined') module.exports = IG;
       return v;
     }
     if (lc && lc.tEnd && Date.now() - lc.tEnd < 10 * 60000 && (lc.stage === 'done' || lc.stage === 'stopped' || lc.stage === 'expired')) {
-      v.alert = true; v.lv = lc; v.conf = lc.conf; v.parts = lc.parts;
+      v.alert = true; v.lv = lc; v.conf = lc.conf; v.parts = lc.parts; v.past = true;
       if (lc.stage === 'stopped') { v.cls = 'sell'; v.head = 'STOPPED OUT'; v.act = 'Price reached the stop ' + P(id, lc.sl) + '. The setup failed. Wait for the next one.'; v.speak = N + ', the ' + sym.word + ' setup was stopped out.'; }
       else if (lc.stage === 'expired') { v.head = 'SETUP EXPIRED'; v.act = 'Price never came back to ' + P(id, lc.entry) + ', so there was no trade.'; v.speak = 'The ' + sym.word + ' setup expired without an entry.'; }
       else if (lc.result === 'win2') { v.cls = 'buy'; v.head = 'TP2 HIT: SETUP COMPLETE'; v.act = 'Both targets were reached. Close the trade.'; v.speak = N + ', take profit two was hit on ' + sym.word + '. Setup complete.'; }
@@ -1460,7 +1469,7 @@ if (typeof module !== 'undefined') module.exports = IG;
     arc.setAttribute('stroke-dasharray', (v.conf !== null ? Math.round(1445 * v.conf / 100) : 0) + ' 1445');
     $('pulse').setAttribute('stroke', col);
     var stAll = IG.stats(CALLS.filter(function (c) { return c.sym === id && !c.demo; }));
-    setTxt('rCf', v.conf !== null ? 'CONFIDENCE ' + v.conf + '%' : (an && an.ok ? 'NO ACTIVE SETUP' : 'STARTING'));
+    setTxt('rCf', v.conf !== null ? (v.past ? 'LAST SETUP ' : 'CONFIDENCE ') + v.conf + '%' : (an && an.ok ? 'NO ACTIVE SETUP' : 'STARTING'));
     setTxt('kConf', v.conf !== null ? v.conf + '%' : '--');
     var gr = v.conf !== null ? IG.grade(v.conf) : '', gb = gr && (st.btL || st.bt) && (st.btL || st.bt).byGrade[gr] ? (st.btL || st.bt).byGrade[gr] : null;
     setTxt('kConfN', v.conf !== null ? gr + (gb ? ': ' + gb.win + ' of ' + gb.n + ' in backtest' : ' score') : 'no setup');
@@ -1493,7 +1502,7 @@ if (typeof module !== 'undefined') module.exports = IG;
     if (!st.demo && st.mode === 'raw' && id !== 'BTC') msgs.push('The spot price feed could not be reached, so levels are in ' + (id === 'GOLD' ? 'tokenised gold (PAXG)' : 'futures') + ' prices and can sit a few dollars from your broker.');
     bn.hidden = !msgs.length; bn.textContent = msgs.join(' ');
     renderPipe(id, v); renderBig(); loadContext();
-    $('ltData').className = 'light ' + (st.raw ? (st.demo ? 'bad' : 'on') : '');
+    dataLight();
     $('ltNews').className = 'light ' + (newsOK ? 'on' : 'bad');
     $('ltVoice').className = 'light ' + (CFG.voice && 'speechSynthesis' in window ? 'on' : '');
     $('ltAlert').className = 'light ' + (CFG.pop || CFG.ping || CFG.desk ? 'on' : '');
@@ -1879,13 +1888,76 @@ if (typeof module !== 'undefined') module.exports = IG;
     return { open: false, min: days * 1440 + o - nowM };
   }
   function tickClock() {
-    var d = new Date(), p = tzParts(d, 'Africa/Johannesburg');
+    var d = new Date(), p = tzParts(d, 'Africa/Johannesburg'), gap = Date.now() - lastTick; lastTick = Date.now();
+    if (gap > 6000) wake('a pause of ' + dur(gap / 60000));
+    dataLight();
     setTxt('clk', ('0' + p.h).slice(-2) + ':' + ('0' + p.m).slice(-2) + ':' + ('0' + p.s).slice(-2));
     setTxt('clk2', 'SOUTH AFRICA · NEW YORK ' + hm(d, 'America/New_York') + ' · LONDON ' + hm(d, 'Europe/London'));
     if (p.s % 20 === 0 || !$('sessions').children.length) {
       var ss = [['TOKYO', 'Asia/Tokyo', 9, 15], ['LONDON', 'Europe/London', 8, 16, 30], ['NEW YORK', 'America/New_York', 8, 17]];
       $('sessions').innerHTML = ss.map(function (x) { var u = untilOpen(x[1], x[2], x[3], x[4]); return '<span class="' + (u.open ? 'live' : u.min <= 90 ? 'soon' : '') + '">' + x[0] + (u.open ? ' open' : ' opens in ' + dur(u.min)) + '</span>'; }).join('');
     }
+  }
+  /* ---------- live stream: Binance pushes every trade, so gold (tokenised) and Bitcoin move as the market moves ---------- */
+  var WSH = ['wss://stream.binance.com:9443', 'wss://data-stream.binance.vision'], ws = null, wsSym = '', wsHost = 0, wsTry = 0, wsTimer = null, flushT = null, lastTick = Date.now(), wl = null;
+  function streaming(id) { var st = S[id]; return !!st.tLive && Date.now() - st.tLive < 5000; }
+  function bump(c, step, t, p, add) {
+    var last = c && c[c.length - 1]; if (!last) return;
+    var b = Math.floor(t / step) * step;
+    if (last.t === b) { last.c = p; if (p > last.h) last.h = p; if (p < last.l) last.l = p; }
+    else if (add && b > last.t) { c.push({ t: b, o: p, h: p, l: p, c: p }); if (c.length > 420) c.shift(); }
+  }
+  function onPrice(id, p, t) {
+    var st = S[id]; if (!st.raw || st.demo || !(p > 0)) return;
+    bump(st.raw.m5, 300000, t, p, true); bump(st.raw.m15, 900000, t, p, true); bump(st.raw.h1, 3600000, t, p, true); bump(st.raw.d1, 86400000, t, p, false);
+    st.tLive = Date.now(); st.tK = st.tLive;
+    st.tkHi = st.tkHi === null ? p : Math.max(st.tkHi, p); st.tkLo = st.tkLo === null ? p : Math.min(st.tkLo, p);
+    if (!flushT) flushT = setTimeout(function () { flushT = null; flush(id); }, 350);
+  }
+  function onKline(id, k) {                                 // the exchange's own 5-minute candle: corrects anything a missed trade left out
+    var st = S[id]; if (!st.raw || st.demo) return;
+    var c = st.raw.m5, last = c[c.length - 1], x = { t: +k.t, o: +k.o, h: +k.h, l: +k.l, c: +k.c }; if (!last || !(x.c > 0)) return;
+    if (last.t === x.t) { last.o = x.o; last.h = x.h; last.l = x.l; last.c = x.c; } else if (x.t > last.t) { c.push(x); if (c.length > 420) c.shift(); }
+  }
+  function flush(id) {
+    var st = S[id]; if (!st.raw || st.demo) return;
+    if (st.tkHi !== null) { var off = st.off || 0, c = st.raw.m5; stepCalls(id, st.tkHi + off, st.tkLo + off, null, 0, c[c.length - 1].t); st.tkHi = st.tkLo = null; }
+    refresh(id);
+  }
+  function wsClose() { clearTimeout(wsTimer); if (ws) { var o = ws; ws = null; try { o.onclose = o.onerror = o.onmessage = null; o.close(); } catch (e) { /* already closed */ } } wsSym = ''; }
+  function wsRetry() { wsHost++; wsTry++; clearTimeout(wsTimer); wsTimer = setTimeout(wsOpen, Math.min(15000, 1500 * wsTry)); }
+  function wsOpen() {
+    var sym = SYMS[active], id = active, sock; clearTimeout(wsTimer);
+    if (!sym.bin || document.hidden || !('WebSocket' in window)) { wsClose(); return; }
+    var sname = sym.bin.toLowerCase(); if (ws && wsSym === sname && ws.readyState <= 1) return;
+    wsClose(); wsSym = sname;
+    try { sock = new WebSocket(WSH[wsHost % WSH.length] + '/stream?streams=' + sname + '@aggTrade/' + sname + '@kline_5m'); } catch (e) { wsRetry(); return; }
+    ws = sock;
+    sock.onopen = function () { wsTry = 0; logEv(sym.label + ' live stream connected', 'up'); };
+    sock.onmessage = function (ev) {
+      if (ws !== sock) return; var m; try { m = JSON.parse(ev.data); } catch (e) { return; }
+      var d = m && m.data; if (!d) return;
+      if (d.e === 'aggTrade') onPrice(id, +d.p, +d.T || Date.now()); else if (d.e === 'kline' && d.k) onKline(id, d.k);
+    };
+    sock.onclose = sock.onerror = function () { if (ws === sock) { ws = null; wsSym = ''; wsRetry(); } };
+  }
+  function dataLight() {
+    var st = S[active], e = $('ltData'), sp = SPOT[SYMS[active].spot], t = Math.max(st.tK || 0, sp ? sp.t : 0), age = t ? (Date.now() - t) / 1000 : null, txt, cls;
+    if (!st.raw) { txt = 'DATA'; cls = ''; }
+    else if (st.demo) { txt = 'DEMO DATA'; cls = 'bad'; }
+    else if (streaming(active)) { txt = 'LIVE'; cls = 'on'; }
+    else if (age !== null && age < 45) { txt = 'DATA ' + Math.round(age) + ' s AGO'; cls = 'on'; }
+    else { txt = 'DATA ' + (age === null ? 'MISSING' : dur(age / 60) + ' OLD'); cls = 'bad'; }
+    e.className = 'light ' + cls; if (e.lastChild && e.lastChild.nodeType === 3) { if (e.lastChild.nodeValue !== txt) e.lastChild.nodeValue = txt; } else e.appendChild(document.createTextNode(txt));
+  }
+  function keepAwake() {                                    // optional: stops the phone from dimming and locking while the page is in front
+    if (!CFG.awake || document.hidden || !navigator.wakeLock) { if (wl && !CFG.awake) { try { wl.release(); } catch (e) { /* gone */ } wl = null; } return; }
+    try { navigator.wakeLock.request('screen').then(function (l) { wl = l; }).catch(function () { /* not allowed right now */ }); } catch (e) { /* not supported */ }
+  }
+  function wake(why) {                                      // the page was asleep (phone locked, app in the background) or the network came back: fetch everything now
+    if (document.hidden) return;
+    logEv('Refreshing after ' + why, 'dim'); wsHost = 0; wsTry = 0; wsOpen(); keepAwake();
+    loadTF(active); spotCycle(); loadNews();
   }
   function loadNews() {
     return direct('https://nfs.faireconomy.media/ff_calendar_thisweek.json').then(function (a) {
@@ -1916,7 +1988,7 @@ if (typeof module !== 'undefined') module.exports = IG;
   function selectMarket(id) {
     active = id; CFG.sym = id; LS.set('ig_cfg', CFG); lastKey = '';
     document.querySelectorAll('.seg button').forEach(function (b) { b.setAttribute('aria-pressed', b.getAttribute('data-sym') === id ? 'true' : 'false'); });
-    render(); ensure(id).then(function () { pollSpot(SYMS[id].spot).then(function () { refresh(id); }); });
+    render(); wsOpen(); ensure(id).then(function () { pollSpot(SYMS[id].spot).then(function () { refresh(id); }); });
   }
 
   /* ---------- wiring ---------- */
@@ -1931,14 +2003,14 @@ if (typeof module !== 'undefined') module.exports = IG;
   $('deepBtn').addEventListener('click', deep);
   $('btLong').addEventListener('click', function () { runLong(active); });
   $('setBtn').addEventListener('click', function () {
-    $('fName').value = CFG.name; $('fVoice').checked = !!CFG.voice; $('fPop').checked = !!CFG.pop; $('fPing').checked = !!CFG.ping; $('fDesk').checked = !!CFG.desk; $('fKey').value = CFG.key; $('fModel').value = CFG.model; $('fBroker').value = '';
+    $('fName').value = CFG.name; $('fVoice').checked = !!CFG.voice; $('fPop').checked = !!CFG.pop; $('fPing').checked = !!CFG.ping; $('fDesk').checked = !!CFG.desk; $('fAwake').checked = !!CFG.awake; $('fKey').value = CFG.key; $('fModel').value = CFG.model; $('fBroker').value = '';
     document.querySelector('label[for="fBroker"]').textContent = "YOUR BROKER'S " + SYMS[active].label + ' PRICE RIGHT NOW (OPTIONAL)';
     try { $('dlg').showModal(); } catch (e) { $('dlg').setAttribute('open', ''); }
   });
   /* closed by script, not by a form submit: some viewers block form submits and the box would stay open */
   function closeDlg() { var d = $('dlg'); try { d.close(); } catch (e) { /* older browser */ } d.removeAttribute('open'); }
   function readAlertBoxes() {
-    CFG.voice = $('fVoice').checked; CFG.pop = $('fPop').checked; CFG.ping = $('fPing').checked; CFG.desk = $('fDesk').checked;
+    CFG.voice = $('fVoice').checked; CFG.pop = $('fPop').checked; CFG.ping = $('fPing').checked; CFG.desk = $('fDesk').checked; CFG.awake = $('fAwake').checked; keepAwake();
     if (CFG.desk && 'Notification' in window && Notification.permission === 'default') { try { Notification.requestPermission(); } catch (e) { /* not supported */ } }
   }
   $('testBtn').addEventListener('click', function () {                // the box closes so the pop-up is not hidden behind it
@@ -1982,7 +2054,7 @@ if (typeof module !== 'undefined') module.exports = IG;
     }).catch(function () { pinBusy = false; setTxt('pinMsg', 'This viewer cannot check the PIN. Open the page in Chrome or Safari from its web address.'); });
   });
   function bootNow() {
-    booted = true; $('boot').hidden = true;
+    booted = true; $('boot').hidden = true; keepAwake();
     var an = S[active].an; say(greet() + ' ' + (an && an.ok ? marketLine(active) : 'I am still loading the market data.') + (newsOK && !verdict(active).closed ? ' ' + newsLine() : ''));
     lastKey = ''; announce(false);
   }
@@ -2010,15 +2082,17 @@ if (typeof module !== 'undefined') module.exports = IG;
   }
   $('updBtn').addEventListener('click', function () { location.replace(location.pathname + '?v=' + encodeURIComponent(NEWB.replace(/[^0-9]/g, ''))); });
   setInterval(checkUpdate, 180000); setTimeout(checkUpdate, 15000);
-  document.addEventListener('visibilitychange', function () { if (!document.hidden) checkUpdate(); });
+  document.addEventListener('visibilitychange', function () { if (document.hidden) wsClose(); else { checkUpdate(); wake('the page came back to the front'); } });
+  window.addEventListener('pageshow', function (e) { if (e.persisted) wake('the page was restored'); });
+  window.addEventListener('online', function () { wake('the connection came back'); });
   logEv('System loaded' + (BUILD ? ', version ' + BUILD : ''));
 
   document.querySelectorAll('.seg button').forEach(function (b) { b.setAttribute('aria-pressed', b.getAttribute('data-sym') === active ? 'true' : 'false'); });
   tickClock(); setInterval(tickClock, 1000);
   render();
   loadNews(); setInterval(loadNews, 30 * 60000);
-  spotCycle(); setInterval(spotCycle, 8000);
-  loadTF(active).then(function () { Object.keys(SYMS).forEach(function (k) { if (k !== active) loadTF(k); }); });
+  spotCycle(); setInterval(spotCycle, 5000);
+  loadTF(active).then(function () { wsOpen(); Object.keys(SYMS).forEach(function (k) { if (k !== active) loadTF(k); }); });
   setInterval(function () { loadTF(active); }, 20000);
   setInterval(function () { Object.keys(SYMS).forEach(function (k) { if (k !== active) loadTF(k); }); }, 150000);
   setInterval(demoTick, 2500);
