@@ -95,6 +95,7 @@ button{cursor:pointer}
 .rc .pair{font-family:var(--mono);font-size:12px;letter-spacing:.28em;color:var(--blue2)}
 .rc .call{font-family:var(--disp);font-weight:800;font-size:clamp(30px,6.2vw,54px);line-height:1;letter-spacing:.06em;color:#fff;text-shadow:0 0 22px rgba(79,209,255,.85)}
 .rc .call.buy{color:var(--up);text-shadow:0 0 22px rgba(61,224,168,.8)} .rc .call.sell{color:var(--down);text-shadow:0 0 22px rgba(255,138,138,.8)} .rc .call.wait{color:var(--warn);text-shadow:0 0 22px rgba(255,159,69,.7)}
+.rc .call.sm{font-size:clamp(26px,5vw,44px)}
 .rc .px{font-family:var(--disp);font-weight:700;font-size:clamp(20px,3.6vw,30px);color:#fff}
 .rc .cf{font-family:var(--mono);font-size:13px;color:var(--txt2)}
 .corner{position:absolute;display:flex;flex-direction:column;gap:1px;font-family:var(--mono)}
@@ -810,13 +811,15 @@ if (typeof module !== 'undefined') module.exports = IG;
   function fmt(v, dp) { if (v === null || v === undefined || isNaN(v)) return '--'; return Number(v).toLocaleString('en-US', { minimumFractionDigits: dp, maximumFractionDigits: dp }); }
   function P(id, v) { return fmt(v + (CFG.brokerOff[id] || 0), SYMS[id].dp); }
   function esc(s) { return String(s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+  var FMT = {};
   function tzParts(d, tz) {
-    var p = new Intl.DateTimeFormat('en-GB', { timeZone: tz, weekday: 'short', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false, year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(d), o = {};
+    var f = FMT[tz] || (FMT[tz] = new Intl.DateTimeFormat('en-GB', { timeZone: tz, weekday: 'short', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false, year: 'numeric', month: '2-digit', day: '2-digit' }));
+    var p = f.formatToParts(d), o = {};
     p.forEach(function (x) { o[x.type] = x.value; });
     return { h: +o.hour % 24, m: +o.minute, s: +o.second, wd: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].indexOf(o.weekday), ymd: o.year + '-' + o.month + '-' + o.day };
   }
   function hm(d, tz) { var p = tzParts(d, tz); return ('0' + p.h).slice(-2) + ':' + ('0' + p.m).slice(-2); }
-  function dur(min) { min = Math.max(0, Math.round(min)); var h = Math.floor(min / 60), m = min % 60; return h ? h + ' h ' + m + ' min' : m + ' min'; }
+  function dur(min) { min = Math.max(0, Math.round(min)); var h = Math.floor(min / 60), m = min % 60; if (h >= 48) return Math.floor(h / 24) + ' days ' + (h % 24) + ' h'; return h ? h + ' h ' + m + ' min' : m + ' min'; }
   function ago(t) { return dur((Date.now() - t) / 60000) + ' ago'; }
   function openAt(id, t) {
     if (id === 'BTC') return true;
@@ -824,6 +827,26 @@ if (typeof module !== 'undefined') module.exports = IG;
     return !(p.wd === 6 || (p.wd === 5 && p.h >= 17) || (p.wd === 0 && p.h < 18));
   }
   function marketOpen(id) { return openAt(id, Date.now()); }
+  var DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+  function nextOpen(id) {                                   // first quarter-hour at which the market is open again
+    var t = Math.ceil(Date.now() / 900000) * 900000;
+    for (var i = 0; i < 400 && !openAt(id, t); i++) t += 900000;
+    return t;
+  }
+  /* the last close before the weekend, with the last session's and the week's high and low (feed prices, before the spot offset) */
+  function closeInfo(id, h) {
+    if (!h || !h.length) return null;
+    var iC = -1, i;
+    for (i = h.length - 1; i >= 0; i--) if (openAt(id, h[i].t + 3599000)) { iC = i; break; }
+    if (iC < 0) return null;
+    var o = { close: h[iC].c, t: h[iC].t + 3600000, fHi: -Infinity, fLo: Infinity, wHi: -Infinity, wLo: Infinity, after: h.length - 1 - iC };
+    for (i = iC; i >= 0 && iC - i < 130; i--) {
+      if (!openAt(id, h[i].t)) break;                       // reached the weekend before
+      if (h[i].h > o.wHi) o.wHi = h[i].h; if (h[i].l < o.wLo) o.wLo = h[i].l;
+      if (iC - i < 23) { if (h[i].h > o.fHi) o.fHi = h[i].h; if (h[i].l < o.fLo) o.fLo = h[i].l; }
+    }
+    return o;
+  }
 
   /* ---------- network ---------- */
   function getJSON(url, ms) {
@@ -899,7 +922,7 @@ if (typeof module !== 'undefined') module.exports = IG;
     var job = sym.bin
       ? Promise.all([binKlines(sym.bin, '5m', 300), binKlines(sym.bin, '15m', 200), binKlines(sym.bin, '1h', 200)]).then(function (a) { return { m5: a[0], m15: a[1], h1: a[2] }; })
       : yahooM5(sym.yahoo).then(function (m5) { st.full = { m5: m5, m15: aggregate(m5, 15), h1: aggregate(m5, 60) }; return { m5: m5.slice(-320), m15: st.full.m15, h1: st.full.h1 }; });
-    return job.then(function (tf) { st.raw = tf; st.demo = false; st.tK = Date.now(); })
+    return job.then(function (tf) { st.raw = tf; st.demo = false; st.tK = Date.now(); st.ci = closeInfo(id, tf.h1); })
       .catch(function () { if (!st.raw) { st.raw = demoTF(sym); st.demo = true; st.tK = Date.now(); } })
       .then(function () { st.loading = false; refresh(id); if (!st.demo && Date.now() - st.tBT > 3600000) runBacktest(id); });
   }
@@ -942,14 +965,17 @@ if (typeof module !== 'undefined') module.exports = IG;
     if (st.demo) { st.mode = 'raw'; st.off = 0; }
     else {
       if (!st.mode) { if (sp) st.mode = 'spot'; else if (Date.now() - T0 > 15000) st.mode = 'raw'; }   // decided once: mixing the two would move every level
-      if (st.mode === 'spot' && live && Math.abs(sp.p - last) / last < 0.03) {
+      var closed = !marketOpen(id);
+      if (st.mode === 'spot' && closed && st.ci && sp && Math.abs(sp.p - st.ci.close) / sp.p < 0.03) {
+        st.off = sp.p - st.ci.close; st.offSet = true;                                                    // spot is frozen at Friday's close; anchor the feed to it
+      } else if (st.mode === 'spot' && !closed && live && Math.abs(sp.p - last) / last < 0.03) {
         st.off = st.offSet ? st.off * 0.85 + (sp.p - last) * 0.15 : sp.p - last; st.offSet = true;       // smoothed so the levels do not wobble
       }
     }
     off = st.off;
     function sh(c) { return c.map(function (x) { return { t: x.t, o: x.o + off, h: x.h + off, l: x.l + off, c: x.c + off }; }); }
     var out = { m5: sh(raw.m5), m15: sh(raw.m15), h1: sh(raw.h1) };
-    if (st.mode === 'spot' && live) { var f = out.m5[out.m5.length - 1]; f.c = sp.p; if (sp.p > f.h) f.h = sp.p; if (sp.p < f.l) f.l = sp.p; }   // the candle still forming ends at the live price
+    if (st.mode === 'spot' && live && marketOpen(id)) { var f = out.m5[out.m5.length - 1]; f.c = sp.p; if (sp.p > f.h) f.h = sp.p; if (sp.p < f.l) f.l = sp.p; }   // the candle still forming ends at the live price
     return out;
   }
   function newsMinutes() {
@@ -1027,8 +1053,24 @@ if (typeof module !== 'undefined') module.exports = IG;
     if (!an || !an.ok) return v;
     var ac = activeCall(id), lc = lastCall(id), N = who();
     if (!marketOpen(id)) {
-      v.head = 'MARKET CLOSED'; v.act = 'The ' + sym.word + ' market is closed for the weekend. It reopens Sunday 18:00 New York time, which is early Monday in South Africa.';
-      v.why = 'No calls are made while the market is closed. Bitcoin trades all week if you want to look at it.'; v.speak = 'The ' + sym.word + ' market is closed, ' + N + '.'; return v;
+      var tO = nextOpen(id), dO = new Date(tO), when = DAYS[tzParts(dO, 'Africa/Johannesburg').wd] + ' ' + hm(dO, 'Africa/Johannesburg') + ' South Africa time';
+      var ci = st.ci, Sym = sym.label.charAt(0) + sym.word.slice(1);
+      v.closed = true; v.call = 'CLOSED'; v.head = 'MARKET CLOSED. PLAN FOR THE OPEN.';
+      if (!ci) { v.act = Sym + ' reopens ' + when + '.'; v.why = 'No calls are made while the market is closed.'; v.speak = 'The ' + sym.word + ' market is closed, ' + N + '.'; return v; }
+      var off = st.off, fc = ci.close + off, move = ci.after > 0 ? an.price - fc : null;
+      v.plan = { close: fc, move: move, open: move === null ? null : an.price, buyAbove: ci.fHi + off, sellBelow: ci.fLo + off, wHi: ci.wHi + off, wLo: ci.wLo + off };
+      v.act = Sym + ' reopens ' + when + '. Friday closed at ' + P(id, fc) + '. ' +
+        (move === null ? 'There is no weekend price for ' + sym.word + ', so the open is unknown.'
+          : Math.abs(move) < an.atr * 0.5 ? 'Tokenised gold has hardly moved over the weekend, so expect an open near the close.'
+          : 'Tokenised gold is ' + (move > 0 ? 'up ' : 'down ') + fmt(Math.abs(move), sym.dp) + ' over the weekend, which points to an open near ' + P(id, an.price) + '.');
+      var bias = an.h1 === 1 ? 'The H1 trend into the close was up, so buys are the stronger side.' : an.h1 === -1 ? 'The H1 trend into the close was down, so sells are the stronger side.' : 'The H1 trend into the close was flat, so neither side is favoured.';
+      var nx = NEWS.filter(function (n) { return n.country === 'USD' && n.impact === 'High' && n.t > Date.now(); })[0];
+      v.why = bias + ' Buy only after a 5-minute close above Friday\'s high ' + P(id, v.plan.buyAbove) + '. Sell only after a close below Friday\'s low ' + P(id, v.plan.sellBelow) + '. Between them, stand aside. ' +
+        'Skip the first 15 minutes after the open: spreads are wide and the first move is often a trap.' +
+        (nx ? ' First high-impact US news: ' + nx.title + ', ' + DAYS[tzParts(new Date(nx.t), 'Africa/Johannesburg').wd] + ' ' + hm(new Date(nx.t), 'Africa/Johannesburg') + '.' : '') +
+        (move !== null ? ' The weekend price comes from a thin market, so treat it as a hint.' : '');
+      v.speak = 'The ' + sym.word + ' market is closed, ' + N + '. It reopens ' + when + '.';
+      return v;
     }
     if (ac) {
       var b = ac.dir === 1, D = b ? 'BUY' : 'SELL';
@@ -1090,7 +1132,7 @@ if (typeof module !== 'undefined') module.exports = IG;
   function render() {
     var id = active, sym = SYMS[id], st = S[id], an = st.an, v = verdict(id);
     setTxt('rPair', sym.pair); setTxt('sysline', sym.label + ' INTELLIGENCE SYSTEM');
-    var call = $('rCall'); call.textContent = v.call; call.className = 'call ' + v.cls;
+    var call = $('rCall'); call.textContent = v.call; call.className = 'call ' + v.cls + (v.closed ? ' sm' : '');
     setTxt('rPx', an && an.ok ? P(id, an.price) : '--');
     var arc = $('arc'), col = v.cls === 'buy' ? '#3DE0A8' : v.cls === 'sell' ? '#FF8A8A' : '#FF9F45';
     arc.setAttribute('stroke', v.conf !== null ? col : '#4FD1FF');
@@ -1125,7 +1167,7 @@ if (typeof module !== 'undefined') module.exports = IG;
     renderTrend(an); renderStruct(id, an); renderMarkets(); renderLog(); renderBT(id); drawChart();
     var bn = $('banner'), msgs = [];
     if (st.demo) msgs.push('DEMO DATA: the live ' + sym.word + ' feed could not be reached from here, so these candles are simulated. Calls made on demo data are not counted.');
-    else if (!marketOpen(id)) msgs.push(sym.label + ' market is closed for the weekend.');
+    else if (!marketOpen(id)) msgs.push(sym.label + ' market is closed for the weekend.' + (sym.bin ? ' The price shown is tokenised gold, which trades all weekend in a thin market.' : ''));
     if (id === 'SILVER' && !st.demo) msgs.push('Silver candles come from a free feed that runs about 10 minutes late, so silver calls arrive late. Gold and Bitcoin candles are live.');
     if (!st.demo && st.mode === 'raw' && id !== 'BTC') msgs.push('The spot price feed could not be reached, so levels are in ' + (id === 'GOLD' ? 'tokenised gold (PAXG)' : 'futures') + ' prices and can sit a few dollars from your broker.');
     bn.hidden = !msgs.length; bn.textContent = msgs.join(' ');
@@ -1149,7 +1191,13 @@ if (typeof module !== 'undefined') module.exports = IG;
   }
   function renderStruct(id, an) {
     if (!an || !an.ok) { $('structRows').innerHTML = ''; $('structBox').innerHTML = ''; return; }
-    var rows = [], r = an.range;
+    var rows = [], r = an.range, pl = verdict(id).plan;
+    if (pl) {
+      rows.push(['FRIDAY CLOSE', P(id, pl.close), '']);
+      rows.push(['WEEKEND MOVE', pl.move === null ? 'NO DATA' : (pl.move >= 0 ? '+' : '') + fmt(pl.move, SYMS[id].dp) + ', open near ' + P(id, pl.open), pl.move === null ? 'dim' : pl.move >= 0 ? 'up' : 'down']);
+      rows.push(['FRIDAY HIGH (BUY ABOVE)', P(id, pl.buyAbove), 'up']); rows.push(['FRIDAY LOW (SELL BELOW)', P(id, pl.sellBelow), 'down']);
+      rows.push(['WEEK HIGH', P(id, pl.wHi), '']); rows.push(['WEEK LOW', P(id, pl.wLo), '']);
+    }
     $('structBox').innerHTML = r ? '<div class="rows"><div class="row"><span>RANGE HIGH</span><b>' + P(id, r.hi) + '</b></div><div class="rangebox"></div><div class="row"><span>RANGE LOW</span><b>' + P(id, r.lo) + '</b></div></div>' : '';
     rows.push(['CONSOLIDATION', r ? 'DETECTED, ' + dur(r.bars * 5) : 'NO', r ? 'warn' : 'dim']);
     var names = { hs: 'HEAD AND SHOULDERS', ihs: 'INVERSE HEAD AND SHOULDERS', dt: 'DOUBLE TOP', db: 'DOUBLE BOTTOM' };
@@ -1228,7 +1276,11 @@ if (typeof module !== 'undefined') module.exports = IG;
     var c = st.tf.m5.slice(-Math.min(96, Math.floor((W - 96) / 7))), an = st.an, off = CFG.brokerOff[active] || 0;
     var lv = activeCall(active), lines = [];
     if (lv) lines.push(['ENTRY', lv.entry, '#4FD1FF'], ['STOP', lv.sl, '#FF8A8A'], ['TP1', lv.tp1, '#3DE0A8'], ['TP2', lv.tp2, '#3DE0A8']);
-    else if (an && an.ok) { if (an.buyAbove !== null) lines.push(['BUY ABOVE', an.buyAbove, '#3DE0A8']); if (an.sellBelow !== null) lines.push(['SELL BELOW', an.sellBelow, '#FF8A8A']); }
+    else if (an && an.ok) {
+      var pl = verdict(active).plan, ba = pl ? pl.buyAbove : an.buyAbove, sb = pl ? pl.sellBelow : an.sellBelow;
+      if (ba !== null) lines.push(['BUY ABOVE', ba, '#3DE0A8']); if (sb !== null) lines.push(['SELL BELOW', sb, '#FF8A8A']);
+      if (pl) lines.push(['FRI CLOSE', pl.close, '#4FD1FF']);
+    }
     var hi = -Infinity, lo = Infinity; c.forEach(function (x) { if (x.h > hi) hi = x.h; if (x.l < lo) lo = x.l; });
     lines.forEach(function (l) { if (l[1] > hi) hi = l[1]; if (l[1] < lo) lo = l[1]; });
     var pad = (hi - lo) * 0.08 || 1; hi += pad; lo -= pad;
@@ -1281,7 +1333,7 @@ if (typeof module !== 'undefined') module.exports = IG;
     if (!an || !an.ok) return 'I could not load ' + sym.word + ' data.';
     var v = verdict(id);
     return sym.label.charAt(0) + sym.word.slice(1) + ' is at ' + P(id, an.price) + (c !== null ? ', ' + (c >= 0 ? 'up ' : 'down ') + Math.abs(c).toFixed(2) + ' percent in the last 30 minutes' : '') + '. ' +
-      trendTxt(an) + ' ' + (an.range ? 'It is in a range, so there is no trade.' : v.act) + (S[id].demo ? ' Note: this is demo data.' : '');
+      (v.closed ? v.act + ' ' + v.why : trendTxt(an) + ' ' + (an.range ? 'It is in a range, so there is no trade.' : v.act)) + (S[id].demo ? ' Note: this is demo data.' : '');
   }
   function structLine(id) {
     var an = S[id].an, sym = SYMS[id]; if (!an || !an.ok) return 'I do not have enough candles yet.';
@@ -1315,7 +1367,7 @@ if (typeof module !== 'undefined') module.exports = IG;
     else if (/structure|pattern|head|shoulder|double|consolidat|forming|range|sweep|liquidity|order block|gap/.test(s)) job = Promise.resolve(structLine(active));
     else if (/news|calendar|release|event/.test(s)) job = Promise.resolve(newsLine());
     else if (/accura|success|score|how (good|right)/.test(s)) job = Promise.resolve(accuracyLine());
-    else if (/brief|morning|afternoon|evening|hello|\bhi\b/.test(s)) job = Promise.resolve(greet() + ' ' + marketLine(active) + ' ' + newsLine());
+    else if (/brief|morning|afternoon|evening|hello|\bhi\b/.test(s)) job = Promise.resolve(greet() + ' ' + marketLine(active) + (verdict(active).closed ? '' : ' ' + newsLine()));
     else if (/trade|enter|entry|buy|sell|should|now|verdict|profit|tp|stop/.test(s)) { var v = verdict(active); job = Promise.resolve(v.head.charAt(0) + v.head.slice(1).toLowerCase() + ' ' + v.act); }
     else if (/gold|xau|move/.test(s)) job = ensure('GOLD').then(function () { return marketLine('GOLD'); });
     else job = Promise.resolve('I can check gold, silver or Bitcoin, read the structure, list the news, or give the accuracy. For anything else, use the deep analysis box.');
@@ -1453,7 +1505,7 @@ if (typeof module !== 'undefined') module.exports = IG;
   $('clearLog').addEventListener('click', function () { CALLS = CALLS.filter(function (c) { return c.stage === 'setup' || c.stage === 'live' || c.stage === 'tp1'; }); saveCalls(); renderLog(); });
   $('bootBtn').addEventListener('click', function () {
     booted = true; $('boot').hidden = true;
-    var an = S[active].an; say(greet() + ' ' + (an && an.ok ? marketLine(active) : 'I am still loading the market data.') + ' ' + (newsOK ? newsLine() : ''));
+    var an = S[active].an; say(greet() + ' ' + (an && an.ok ? marketLine(active) : 'I am still loading the market data.') + (newsOK && !verdict(active).closed ? ' ' + newsLine() : ''));
     lastKey = ''; announce(false);
   });
   window.addEventListener('resize', drawChart);
