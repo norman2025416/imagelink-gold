@@ -61,6 +61,34 @@ button{cursor:pointer}
 .banner{padding:10px 14px;border:1px dashed var(--warn);color:#FFD9B0;font-family:var(--mono);font-size:13px;background:rgba(255,159,69,.08)}
 .banner[hidden]{display:none}
 
+/* pipeline strip: how the verdict is reached */
+.pipe{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px}
+.pipe button{position:relative;min-height:58px;padding:8px 12px 8px 30px;text-align:left;background:rgba(6,24,42,.6);border:1px solid var(--line2);color:var(--txt);display:flex;flex-direction:column;gap:2px;justify-content:center}
+.pipe button:hover{border-color:var(--blue);background:rgba(79,209,255,.08)}
+.pipe button i{position:absolute;left:11px;top:50%;width:9px;height:9px;margin-top:-5px;background:#5F7690}
+.pipe button small{font-family:var(--mono);font-size:12px;letter-spacing:.16em;color:var(--txt3)}
+.pipe button b{font-family:var(--disp);font-weight:700;font-size:15px;letter-spacing:.04em;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pipe button.ok i{background:var(--up);box-shadow:0 0 8px var(--up)} .pipe button.ok{border-color:rgba(61,224,168,.45)}
+.pipe button.warn i{background:var(--warn);box-shadow:0 0 8px var(--warn)} .pipe button.warn{border-color:rgba(255,159,69,.5)}
+.pipe button.bad i{background:var(--down);box-shadow:0 0 8px var(--down)} .pipe button.bad{border-color:rgba(255,138,138,.5)}
+.flash{animation:flash 1.2s ease-out}
+@keyframes flash{0%{box-shadow:0 0 0 2px #fff,0 0 30px rgba(79,209,255,.9)}100%{box-shadow:none}}
+
+/* activity feed + meters + debate */
+.feed{display:flex;flex-direction:column;gap:6px;max-height:260px;overflow-y:auto;font-family:var(--mono);font-size:13px}
+.feed div{display:grid;grid-template-columns:62px minmax(0,1fr);gap:8px;padding:5px 0;border-bottom:1px solid var(--line2);color:var(--txt)}
+.feed div:last-child{border-bottom:0} .feed time{color:var(--txt3)}
+.feed .up{color:var(--up)} .feed .down{color:var(--down)} .feed .warn{color:var(--warn)}
+.meter{height:8px;background:#0C2B47;position:relative;margin-top:2px}
+.meter i{position:absolute;left:0;top:0;bottom:0;background:var(--blue);box-shadow:0 0 8px rgba(79,209,255,.7)}
+.debate{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(240px,100%),1fr));gap:10px}
+.debate section{padding:10px 12px;border-left:3px solid var(--line);background:rgba(79,209,255,.06)}
+.debate section.bull{border-left-color:var(--up)} .debate section.bear{border-left-color:var(--down)} .debate section.risk{border-left-color:var(--warn)} .debate section.risk{grid-column:1/-1} .debate section.verd{border-left-color:#fff;grid-column:1/-1}
+.debate h4{margin:0 0 4px;font-family:var(--disp);font-size:13px;letter-spacing:.18em;color:var(--blue2)}
+.debate p{margin:0;font-size:14px;color:#fff;white-space:normal}
+.rating{display:inline-block;margin-top:8px;padding:5px 12px;font-family:var(--disp);font-weight:800;letter-spacing:.12em;font-size:15px;border:1px solid var(--warn);color:var(--warn)}
+.rating.buy{border-color:var(--up);color:var(--up)} .rating.sell{border-color:var(--down);color:var(--down)}
+
 /* grid + panels */
 .grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.25fr) minmax(0,1fr);gap:16px;align-items:start}
 .col{display:flex;flex-direction:column;gap:16px;min-width:0}
@@ -227,10 +255,11 @@ fieldset.alerts .btn{align-self:flex-start;margin-top:6px}
     <div class="sessions" id="sessions"></div>
   </div>
   <div class="banner" id="banner" hidden></div>
+  <nav class="pipe" id="pipe" aria-label="How the verdict is reached. Select a step to jump to its panel."></nav>
 
   <main class="grid">
     <div class="col">
-      <section class="panel">
+      <section class="panel" id="pMk">
         <div class="ph"><h2>MARKETS</h2><i></i><span>LIVE</span></div>
         <div id="markets"></div>
         <div class="alert" id="leadAlert" hidden><small>ALERT</small><span id="leadTxt"></span></div>
@@ -239,6 +268,12 @@ fieldset.alerts .btn{align-self:flex-start;margin-top:6px}
       <section class="panel">
         <div class="ph"><h2>TREND</h2><i></i><span id="trendTag"></span></div>
         <div class="rows" id="trendRows"></div>
+      </section>
+      <section class="panel" id="pBig">
+        <div class="ph"><h2>BIG PICTURE</h2><i></i><span id="bigTag"></span></div>
+        <div class="rows" id="bigRows"><div class="note">Loading positioning and sentiment.</div></div>
+        <div class="note" id="bigRead"></div>
+        <div class="note">Context only. It does not change the call or the confidence score.</div>
       </section>
     </div>
 
@@ -302,15 +337,19 @@ fieldset.alerts .btn{align-self:flex-start;margin-top:6px}
     </div>
 
     <div class="col">
-      <section class="panel r">
+      <section class="panel r" id="pNews">
         <div class="ph"><span>USD</span><i></i><h2>NEWS TODAY</h2></div>
         <div class="news" id="news"><div class="note">Loading the calendar.</div></div>
         <div class="note">Times are South Africa time, with New York time beside them. High-impact releases pause new calls 15 minutes either side.</div>
       </section>
-      <section class="panel r">
+      <section class="panel r" id="pScan">
         <div class="ph"><span>M5</span><i></i><h2>STRUCTURE SCAN</h2></div>
         <div id="structBox"></div>
         <div class="rows" id="structRows"></div>
+      </section>
+      <section class="panel r" id="pFeed">
+        <div class="ph"><span>THIS SESSION</span><i></i><h2>ACTIVITY</h2></div>
+        <div class="feed" id="feed" aria-live="off"><div class="note">Nothing yet.</div></div>
       </section>
     </div>
   </main>
@@ -358,7 +397,7 @@ fieldset.alerts .btn{align-self:flex-start;margin-top:6px}
 
     <section class="panel r">
       <div class="ph"><span>PAID</span><i></i><h2>DEEP ANALYSIS WITH CLAUDE</h2></div>
-      <div class="note">Optional. Sends the current readings to Claude and returns a written second opinion. It uses your own Claude API credit each time you press the button, and nothing is sent unless you press it.</div>
+      <div class="note">Optional. Sends the current readings to Claude, which argues the bull case and the bear case, gives a risk view and then a verdict with a rating. It uses your own Claude API credit each time you press the button, and nothing is sent unless you press it.</div>
       <div class="field"><label for="deepQ">YOUR QUESTION</label><textarea id="deepQ" rows="3" placeholder="Example: Is this a good place to buy, and what would prove it wrong?"></textarea></div>
       <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center">
         <button class="btn warnb" id="deepBtn" type="button">ANALYSE DEEPER (USES CREDIT)</button>
@@ -781,13 +820,17 @@ var IG = (function () {
       }
     }
     var st = E.stats(calls), net = 0, peak = 0, dd = 0, byType = {}, byGrade = {};
+    var gw = 0, gl = 0, nw = 0, nl = 0, run = 0, maxRun = 0;
     calls.forEach(function (k) {
       if (!(k.stage === 'stopped' || k.stage === 'done' || k.stage === 'tp1')) return;
       var r = E.callR(k); net += r; if (net > peak) peak = net; if (peak - net > dd) dd = peak - net;
+      if (r > 0) { gw += r; nw++; run = 0; } else if (r < 0) { gl -= r; nl++; run++; if (run > maxRun) maxRun = run; }
       var b = byType[k.type] || (byType[k.type] = { n: 0, win: 0 }); b.n++; if (k.result !== 'loss') b.win++;
       var gq = byGrade[k.grade] || (byGrade[k.grade] = { n: 0, win: 0 }); gq.n++; if (k.result !== 'loss') gq.win++;
     });
     return { calls: calls, n: st.n, win: st.win, pct: st.pct, skipped: st.skipped, netR: Math.round(net * 10) / 10, ddR: Math.round(dd * 10) / 10,
+             pf: gl > 0 ? Math.round(gw / gl * 100) / 100 : null, expR: st.n ? Math.round(net / st.n * 100) / 100 : null,
+             avgWinR: nw ? Math.round(gw / nw * 100) / 100 : null, avgLossR: nl ? Math.round(gl / nl * 100) / 100 : null, lossRun: maxRun,
              byType: byType, byGrade: byGrade, from: m5[warm].t, to: m5[n].t, hours: Math.round((m5[n].t - m5[warm].t) / 3600000) };
   };
 
@@ -953,8 +996,8 @@ if (typeof module !== 'undefined') module.exports = IG;
     var job = sym.bin
       ? Promise.all([binKlines(sym.bin, '5m', 300), binKlines(sym.bin, '15m', 200), binKlines(sym.bin, '1h', 200)]).then(function (a) { return { m5: a[0], m15: a[1], h1: a[2] }; })
       : yahooM5(sym.yahoo).then(function (m5) { st.full = { m5: m5, m15: aggregate(m5, 15), h1: aggregate(m5, 60) }; return { m5: m5.slice(-320), m15: st.full.m15, h1: st.full.h1 }; });
-    return job.then(function (tf) { st.raw = tf; st.demo = false; st.tK = Date.now(); st.ci = closeInfo(id, tf.h1); })
-      .catch(function () { if (!st.raw) { st.raw = demoTF(sym); st.demo = true; st.tK = Date.now(); } })
+    return job.then(function (tf) { if (!st.raw || st.demo) logEv(sym.label + ' candles live', 'up'); st.raw = tf; st.demo = false; st.tK = Date.now(); st.ci = closeInfo(id, tf.h1); })
+      .catch(function () { if (!st.raw) { st.raw = demoTF(sym); st.demo = true; st.tK = Date.now(); logEv(sym.label + ' feed not reachable, showing demo data', 'warn'); } })
       .then(function () { st.loading = false; refresh(id); if (!st.demo && Date.now() - st.tBT > 3600000) runBacktest(id); });
   }
   /* replay the rules over about a week of history so the success rate is not an empty number on day one */
@@ -969,6 +1012,7 @@ if (typeof module !== 'undefined') module.exports = IG;
     job.then(function (tf) {
       if (!tf) return;
       st.bt = IG.backtest(tf, { sym: id, isOpen: function (t) { return openAt(id, t); } });
+      if (st.bt && st.bt.n) logEv(SYMS[id].label + ' backtest done: ' + st.bt.win + ' of ' + st.bt.n + ' calls hit TP1 (' + st.bt.pct + '%)');
       if (id === active) render();
     }).catch(function () { st.tBT = Date.now() - 3300000; });          // try again in five minutes
   }
@@ -1024,6 +1068,107 @@ if (typeof module !== 'undefined') module.exports = IG;
     return c > 0 ? 1 : -1;
   }
 
+  /* ---------- activity feed: what the system did this session ---------- */
+  var FEED = [];
+  function logEv(txt, cls) {
+    for (var q = FEED.length - 1; q >= 0 && q >= FEED.length - 10; q--) if (FEED[q].txt === txt && Date.now() - FEED[q].t < 120000) return;   // no repeats
+    FEED.push({ t: Date.now(), txt: txt, cls: cls || '' });
+    if (FEED.length > 80) FEED.shift();
+    var box = $('feed'); if (!box) return;
+    box.innerHTML = FEED.slice().reverse().map(function (x) {
+      var p = tzParts(new Date(x.t), 'Africa/Johannesburg');
+      return '<div><time>' + ('0' + p.h).slice(-2) + ':' + ('0' + p.m).slice(-2) + ':' + ('0' + p.s).slice(-2) + '</time><span class="' + x.cls + '">' + esc(x.txt) + '</span></div>';
+    }).join('');
+  }
+
+  /* ---------- big picture: positioning and sentiment. Context only, never part of the score. ----------
+     Sources: CFTC weekly Commitments of Traders (public), the crypto Fear and Greed index, Deribit's public ticker. */
+  var CTX = { cot: {}, fng: null, drb: null, tCot: {}, tFng: 0, tDrb: 0 };
+  var COT_CODE = { GOLD: '088691', SILVER: '084691' };
+  function loadCOT(id) {
+    var code = COT_CODE[id]; if (!code || Date.now() - (CTX.tCot[id] || 0) < 6 * 3600000) return;
+    CTX.tCot[id] = Date.now();
+    var u = 'https://publicreporting.cftc.gov/resource/72hh-3qpy.json?$select=' + encodeURIComponent('report_date_as_yyyy_mm_dd,m_money_positions_long_all,m_money_positions_short_all') +
+      '&$where=' + encodeURIComponent("cftc_contract_market_code='" + code + "'") + '&$order=' + encodeURIComponent('report_date_as_yyyy_mm_dd DESC') + '&$limit=53';
+    direct(u).then(function (rows) {
+      if (!Array.isArray(rows) || rows.length < 2) throw new Error('short');
+      var nets = rows.map(function (r) { return (+r.m_money_positions_long_all) - (+r.m_money_positions_short_all); }).filter(function (v) { return !isNaN(v); });
+      if (nets.length < 2) throw new Error('bad');
+      var below = 0; for (var i = 1; i < nets.length; i++) if (nets[i] <= nets[0]) below++;
+      CTX.cot[id] = { date: String(rows[0].report_date_as_yyyy_mm_dd).slice(0, 10), long: +rows[0].m_money_positions_long_all, short: +rows[0].m_money_positions_short_all,
+                      net: nets[0], chg: nets[0] - nets[1], pct: Math.round(100 * below / (nets.length - 1)), weeks: nets.length };
+      logEv(SYMS[id].label + ' positioning loaded (report of ' + CTX.cot[id].date + ')');
+      if (id === active) renderBig();
+    }).catch(function () { CTX.tCot[id] = Date.now() - 6 * 3600000 + 10 * 60000; if (id === active) renderBig(); });   // try again in ten minutes
+  }
+  function loadFNG() {
+    if (Date.now() - CTX.tFng < 3600000) return; CTX.tFng = Date.now();
+    direct('https://api.alternative.me/fng/?limit=2').then(function (j) {
+      var d = j && j.data; if (!d || !d.length) throw new Error('bad');
+      CTX.fng = { v: +d[0].value, label: d[0].value_classification, prev: d[1] ? +d[1].value : null };
+      if (active === 'BTC') renderBig();
+    }).catch(function () { CTX.tFng = Date.now() - 3600000 + 10 * 60000; });
+  }
+  function loadDRB() {
+    if (Date.now() - CTX.tDrb < 60000) return; CTX.tDrb = Date.now();
+    direct('https://www.deribit.com/api/v2/public/ticker?instrument_name=BTC-PERPETUAL').then(function (j) {
+      var r = j && j.result; if (!r) throw new Error('bad');
+      CTX.drb = { fund: +r.funding_8h, oi: +r.open_interest, t: Date.now() };
+      if (active === 'BTC') renderBig();
+    }).catch(function () { /* keep the last value */ });
+  }
+  function loadContext() { if (active === 'BTC') { loadFNG(); loadDRB(); } else loadCOT(active); }
+  function big(n) { var s = n < 0 ? '-' : '+'; return s + Math.abs(Math.round(n)).toLocaleString('en-US'); }
+  function renderBig() {
+    var id = active, rows = [], read = '', tag = '';
+    function row(k, v, cls) { rows.push('<div class="row"><span>' + k + '</span><b class="' + (cls || '') + '">' + v + '</b></div>'); }
+    if (id === 'BTC') {
+      tag = 'SENTIMENT';
+      var f = CTX.fng, d = CTX.drb;
+      if (f) row('Fear and Greed', f.v + ' ' + esc(String(f.label).toUpperCase()) + (f.prev !== null ? ' (yesterday ' + f.prev + ')' : ''), f.v >= 75 ? 'warn' : f.v <= 25 ? 'warn' : '');
+      if (d) {
+        var fp = d.fund * 100;
+        row('Funding, per 8 hours', (fp >= 0 ? '+' : '') + fp.toFixed(4) + '%', Math.abs(fp) >= 0.01 ? 'warn' : '');
+        row('Open interest', '$' + Math.round(d.oi / 1e6).toLocaleString('en-US') + 'M');
+      }
+      if (f) read = f.v >= 75 ? 'Extreme greed: late buyers are in, so pullbacks tend to be sharper.' : f.v <= 25 ? 'Extreme fear: sellers are exhausted more often than not, but falls can still extend.' : 'Sentiment is not at an extreme.';
+      if (d && Math.abs(d.fund * 100) >= 0.01) read += (d.fund > 0 ? ' Funding is high: longs are paying to hold, a sign of crowded buying.' : ' Funding is negative: shorts are paying to hold, a sign of crowded selling.');
+      if (!f && !d) rows.push('<div class="note">Sentiment data could not be loaded.</div>');
+    } else {
+      tag = 'POSITIONING';
+      var c = CTX.cot[id];
+      if (!c) rows.push('<div class="note">' + (CTX.tCot[id] ? 'Positioning data could not be loaded.' : 'Loading positioning.') + '</div>');
+      else {
+        row('Funds net position', big(c.net), c.net >= 0 ? 'up' : 'down');
+        row('Change on the week', big(c.chg), c.chg >= 0 ? 'up' : 'down');
+        rows.push('<div class="row"><span>Past-year rank</span><b>above ' + c.pct + '% of weeks</b></div><div class="meter" role="img" aria-label="' + c.pct + ' percent"><i style="width:' + c.pct + '%"></i></div>');
+        row('Report (weekly, contracts)', esc(c.date), 'dim');
+        read = (c.pct >= 85 ? 'Funds are more long than in most of the past year. That backs the trend, but leaves less fuel and more room for a shake-out.'
+              : c.pct <= 15 ? 'Funds are less long than in most of the past year. There is room for them to buy, but they are not pushing yet.' : 'Positioning is not at an extreme.') +
+               (c.chg < 0 ? ' Funds reduced their net long this week.' : ' Funds added to their net long this week.');
+      }
+    }
+    setTxt('bigTag', tag); $('bigRows').innerHTML = rows.join(''); setTxt('bigRead', read);
+  }
+  function bigSnapshot() {
+    if (active === 'BTC') return { fear_greed: CTX.fng ? { value: CTX.fng.v, label: CTX.fng.label } : null, perpetual_funding_8h_pct: CTX.drb ? +(CTX.drb.fund * 100).toFixed(4) : null };
+    var c = CTX.cot[active]; return c ? { funds_net_futures_contracts: c.net, change_on_week: c.chg, percentile_vs_past_year: c.pct, report_date: c.date } : null;
+  }
+
+  /* ---------- pipeline strip: the five steps behind the verdict; each one jumps to its panel ---------- */
+  function renderPipe(id, v) {
+    var st = S[id], an = st.an, ok = an && an.ok, nm = newsMinutes(), closed = !marketOpen(id);
+    var steps = [
+      ['DATA', !st.raw ? 'LOADING' : st.demo ? 'DEMO DATA' : 'LIVE', !st.raw ? '' : st.demo ? 'bad' : 'ok', 'pMk'],
+      ['STRUCTURE', !ok ? '--' : an.range ? 'RANGE' : an.structure + (an.lastBreak ? ', ' + ago(an.lastBreak.t) : ''), !ok ? '' : an.range ? 'warn' : 'ok', 'pScan'],
+      ['SCORE', v.conf !== null ? v.conf + '% ' + IG.grade(v.conf) : 'NO SETUP', v.conf === null ? '' : v.conf >= 58 ? 'ok' : 'warn', 'confBox'],
+      ['RISK CHECK', closed ? 'MARKET CLOSED' : (nm !== null && nm <= 15) ? 'NEWS WINDOW' : (ok && an.range) ? 'INSIDE RANGE' : 'CLEAR', closed || (nm !== null && nm <= 15) ? 'bad' : (ok && an.range) ? 'warn' : 'ok', 'pNews'],
+      ['VERDICT', v.call, v.cls === 'buy' ? 'ok' : v.cls === 'sell' ? 'bad' : 'warn', 'verdict']
+    ];
+    var html = steps.map(function (x) { return '<button type="button" class="' + x[2] + '" data-go="' + x[3] + '"><i></i><small>' + x[0] + '</small><b>' + esc(x[1]) + '</b></button>'; }).join('');
+    var el = $('pipe'); if (el.getAttribute('data-h') !== html) { el.innerHTML = html; el.setAttribute('data-h', html); }
+  }
+
   /* ---------- calls: created from a setup, then tracked to the stop or the targets ---------- */
   function saveCalls() { LS.set('ig_calls', CALLS.filter(function (c) { return !c.demo; }).slice(-300)); }
   function activeCall(id) {
@@ -1035,7 +1180,8 @@ if (typeof module !== 'undefined') module.exports = IG;
     var c = activeCall(id); if (!c) return;
     var before = c.stage;
     IG.stepCall(c, hi, lo, Date.now(), barT === undefined ? null : barT);
-    if (c.stage !== before) { saveCalls(); if (id === active) announce(true); else if (booted && !c.demo && c.stage !== 'cancelled') alertUser(id, verdict(id)); }
+    if (c.stage !== before) { logEv(SYMS[id].label + ' call: ' + ({ live: 'entry reached', tp1: 'TP1 hit', done: c.result === 'win2' ? 'TP2 hit, complete' : 'runner closed at entry', stopped: 'stopped out', expired: 'expired, no entry' }[c.stage] || c.stage), c.stage === 'stopped' ? 'down' : c.stage === 'expired' ? 'dim' : 'up');
+      saveCalls(); if (id === active) announce(true); else if (booted && !c.demo && c.stage !== 'cancelled') alertUser(id, verdict(id)); }
   }
   function manage(id) {
     var st = S[id], an = st.an; if (!an || !an.ok) return;
@@ -1043,7 +1189,7 @@ if (typeof module !== 'undefined') module.exports = IG;
     if (ac && ac.stage === 'setup' && an.lastBreak && an.lastBreak.dir === -ac.dir && an.lastBreak.t > ac.breakT) { ac.stage = 'cancelled'; ac.tEnd = Date.now(); saveCalls(); ac = null; }
     if (!ac && an.setup && marketOpen(id) && st.mode) {
       var k = IG.makeCall(id, an.setup, Date.now(), st.demo);
-      if (!CALLS.some(function (c) { return c.key === k.key; })) { CALLS.push(k); saveCalls(); if (id !== active && booted && !k.demo) alertUser(id, verdict(id)); }
+      if (!CALLS.some(function (c) { return c.key === k.key; })) { CALLS.push(k); saveCalls(); if (!k.demo) logEv(SYMS[id].label + ' ' + (k.dir === 1 ? 'BUY' : 'SELL') + ' setup, ' + (k.type === 'sweep' ? 'sweep and reclaim' : 'break and retest') + ', entry ' + P(id, k.entry) + ', confidence ' + k.conf + '%', k.dir === 1 ? 'up' : 'down'); if (id !== active && booted && !k.demo) alertUser(id, verdict(id)); }
     }
   }
 
@@ -1202,6 +1348,7 @@ if (typeof module !== 'undefined') module.exports = IG;
     if (id === 'SILVER' && !st.demo) msgs.push('Silver candles come from a free feed that runs about 10 minutes late, so silver calls arrive late. Gold and Bitcoin candles are live.');
     if (!st.demo && st.mode === 'raw' && id !== 'BTC') msgs.push('The spot price feed could not be reached, so levels are in ' + (id === 'GOLD' ? 'tokenised gold (PAXG)' : 'futures') + ' prices and can sit a few dollars from your broker.');
     bn.hidden = !msgs.length; bn.textContent = msgs.join(' ');
+    renderPipe(id, v); renderBig(); loadContext();
     $('ltData').className = 'light ' + (st.raw ? (st.demo ? 'bad' : 'on') : '');
     $('ltNews').className = 'light ' + (newsOK ? 'on' : 'bad');
     $('ltVoice').className = 'light ' + (CFG.voice && 'speechSynthesis' in window ? 'on' : '');
@@ -1298,7 +1445,11 @@ if (typeof module !== 'undefined') module.exports = IG;
     var parts = [], names = { retest: 'break and retest', sweep: 'sweep and reclaim' };
     Object.keys(bt.byType).forEach(function (k) { parts.push((names[k] || k) + ' ' + bt.byType[k].win + ' of ' + bt.byType[k].n); });
     box.innerHTML = '<b>' + sym.label + ', last ' + Math.round(bt.hours / 24) + ' days:</b> ' + bt.n + ' calls reached the entry, ' + bt.win + ' hit TP1 first (<b>' + bt.pct + '%</b>). ' +
-      'Result <b class="' + (bt.netR >= 0 ? 'up' : 'down') + '">' + (bt.netR >= 0 ? '+' : '') + bt.netR.toFixed(1) + 'R</b>, worst losing run <b>' + bt.ddR.toFixed(1) + 'R</b>. ' + esc(parts.join(', ')) + '. ' + bt.skipped + ' setups never reached the entry.';
+      'Result <b class="' + (bt.netR >= 0 ? 'up' : 'down') + '">' + (bt.netR >= 0 ? '+' : '') + bt.netR.toFixed(1) + 'R</b>, worst drawdown <b>' + bt.ddR.toFixed(1) + 'R</b>. ' +
+      (bt.pf !== null ? 'Profit factor <b>' + bt.pf.toFixed(2) + '</b>. ' : '') +
+      (bt.avgWinR !== null && bt.avgLossR !== null ? 'Average win <b>+' + bt.avgWinR.toFixed(2) + 'R</b>, average loss <b>-' + bt.avgLossR.toFixed(2) + 'R</b>. ' : '') +
+      (bt.expR !== null ? 'Per call <b class="' + (bt.expR >= 0 ? 'up' : 'down') + '">' + (bt.expR >= 0 ? '+' : '') + bt.expR.toFixed(2) + 'R</b>. ' : '') +
+      'Longest losing streak <b>' + bt.lossRun + '</b>. ' + esc(parts.join(', ')) + '. ' + bt.skipped + ' setups never reached the entry.';
   }
   function drawChart() {
     var cv = $('chart'), st = S[active], sym = SYMS[active]; if (!st.tf) return;
@@ -1400,6 +1551,7 @@ if (typeof module !== 'undefined') module.exports = IG;
     var v = verdict(active), key = active + '|' + v.head + '|' + (v.lv ? v.lv.key + v.lv.stage : '');
     if (key === lastKey && !force) return;
     var first = lastKey === ''; lastKey = key;
+    logEv(SYMS[active].label + ' verdict: ' + v.head, v.cls === 'buy' ? 'up' : v.cls === 'sell' ? 'down' : 'warn');
     if (!v.speak || !v.alert || !booted || first) return;
     if (v.speak !== lastSpoken) { lastSpoken = v.speak; alertUser(active, v); }
   }
@@ -1482,24 +1634,52 @@ if (typeof module !== 'undefined') module.exports = IG;
       last_30_five_minute_closes: S[id].tf ? S[id].tf.m5.slice(-30).map(function (x) { return +x.c.toFixed(SYMS[id].dp); }) : []
     };
   }
+  /* The written analysis is asked for as a debate: bull case, bear case, risk view, then a verdict with a rating. */
+  function debateHTML(t) {
+    var keys = [['BULL CASE', 'bull'], ['BEAR CASE', 'bear'], ['RISK VIEW', 'risk'], ['VERDICT', 'verd']], out = {}, rating = '';
+    var m = t.match(/RATING\s*:\s*(LEAN BUY|LEAN SELL|BUY|SELL|HOLD)/i); if (m) rating = m[1].toUpperCase();
+    var body = t.replace(/RATING\s*:.*$/im, '');
+    keys.forEach(function (k, n) {
+      var re = new RegExp(k[0] + '\\s*:\\s*([\\s\\S]*?)(?=' + keys.slice(n + 1).map(function (x) { return x[0] + '\\s*:'; }).join('|') + (n < keys.length - 1 ? '|' : '') + '$)', 'i');
+      var r = body.match(re); if (r) out[k[1]] = r[1].trim();
+    });
+    if (!out.bull || !out.bear || !out.verd) return null;
+    var rc = /BUY/.test(rating) ? 'buy' : /SELL/.test(rating) ? 'sell' : '';
+    return '<div class="debate">' + keys.map(function (k) {
+      if (!out[k[1]]) return '';
+      return '<section class="' + k[1] + '"><h4>' + k[0] + '</h4><p>' + esc(out[k[1]]) + '</p>' + (k[1] === 'verd' && rating ? '<span class="rating ' + rc + '">RATING: ' + rating + '</span>' : '') + '</section>';
+    }).join('') + '</div>';
+  }
   function deep() {
     var out = $('deepOut'), q = $('deepQ').value.trim() || 'Give me your read of this market right now.';
     if (!CFG.key) { out.textContent = 'Add your Claude API key in Settings first.'; return; }
     out.textContent = 'Asking Claude...'; $('deepBtn').disabled = true;
+    var snap = snapshot(); snap.big_picture = bigSnapshot();
     fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: { 'content-type': 'application/json', 'x-api-key': CFG.key, 'anthropic-version': '2023-06-01', 'anthropic-dangerous-direct-browser-access': 'true' },
       body: JSON.stringify({
-        model: CFG.model, max_tokens: 700,
-        system: 'You are Imagelink, a concise market analyst helping a discretionary trader called ' + who() + '. Use only the data in the message. Give: your read of direction, the key levels, what would prove the idea wrong, and the main risk. Say plainly when the data does not support a trade. Never promise an outcome. Plain text, under 180 words.',
-        messages: [{ role: 'user', content: 'Readings (JSON):\n' + JSON.stringify(snapshot()) + '\n\nQuestion: ' + q }]
+        model: CFG.model, max_tokens: 900,
+        system: 'You are the research desk of Imagelink, helping a discretionary trader called ' + who() + '. Use only the data in the message. ' +
+          'Write exactly five sections, each starting on its own line with its label in capitals and a colon. ' +
+          'BULL CASE: two or three sentences, the strongest argument for higher prices in this data. ' +
+          'BEAR CASE: two or three sentences, the strongest argument for lower prices. ' +
+          'RISK VIEW: two sentences: what would prove the current plan wrong, and the main event risk. ' +
+          'VERDICT: two sentences: which case is stronger and what to do now. Say plainly when the data does not support a trade. ' +
+          'RATING: exactly one of BUY, LEAN BUY, HOLD, LEAN SELL, SELL. ' +
+          'Conflict between the cases is not by itself a reason for HOLD; commit to the stronger side, and choose HOLD only when neither is. ' +
+          'Never promise an outcome. Plain text, no markdown, under 230 words.',
+        messages: [{ role: 'user', content: 'Readings (JSON):\n' + JSON.stringify(snap) + '\n\nQuestion: ' + q }]
       })
     }).then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
       .then(function (x) {
         if (!x.ok) { out.textContent = 'Claude returned an error: ' + ((x.j && x.j.error && x.j.error.message) || 'unknown') + '. Check the key and that the account has credit.'; return; }
         var t = (x.j.content || []).map(function (b) { return b.text || ''; }).join('').trim();
-        out.textContent = t || 'No text came back.';
-        if (t) speak(t.split(/(?<=[.!?])\s+/).slice(0, 2).join(' '));
+        var h = t ? debateHTML(t) : null;
+        if (h) out.innerHTML = h; else out.textContent = t || 'No text came back.';
+        logEv('Deep analysis received');
+        var vm = t.match(/VERDICT\s*:\s*([\s\S]*?)(?=RATING\s*:|$)/i);
+        if (t) speak((vm ? vm[1] : t).split(/(?<=[.!?])\s+/).slice(0, 2).join(' '));
       })
       .catch(function () { out.textContent = 'Could not reach Claude from this browser. Check the internet connection and the key.'; })
       .then(function () { $('deepBtn').disabled = false; });
@@ -1595,6 +1775,17 @@ if (typeof module !== 'undefined') module.exports = IG;
     lastKey = ''; announce(false);
   });
   window.addEventListener('resize', drawChart);
+  $('pipe').addEventListener('click', function (e) {
+    var t = e.target; while (t && t !== this && !(t.getAttribute && t.getAttribute('data-go'))) t = t.parentNode;
+    var go = t && t.getAttribute && t.getAttribute('data-go'); if (!go) return;
+    var el = $(go); if (!el) return;
+    if (el.tagName === 'DETAILS') el.open = true;
+    if (el.hidden) el = $('verdict');
+    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    el.classList.remove('flash'); void el.offsetWidth; el.classList.add('flash');
+  });
+  setInterval(loadContext, 60000);
+  logEv('System loaded');
 
   document.querySelectorAll('.seg button').forEach(function (b) { b.setAttribute('aria-pressed', b.getAttribute('data-sym') === active ? 'true' : 'false'); });
   tickClock(); setInterval(tickClock, 1000);
