@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="theme-color" content="#01060C">
-<meta name="ig-build" content="2026-10-11 20:08">
+<meta name="ig-build" content="2026-10-11 20:40">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -379,6 +379,15 @@ table.bt td.up{color:var(--up)} table.bt td.down{color:var(--down)}
         <summary>WHY THIS CONFIDENCE</summary>
         <div class="rows" id="confRows"></div>
       </details>
+
+      <section class="panel" id="pPred">
+        <div class="ph"><h2>PREDICTION CHART</h2><i></i><span id="predTag">1-hour candles and the next 24 hours</span></div>
+        <div class="alert"><small id="predOutT">NEXT 24 HOURS</small><div id="predOut">Waiting for candles.</div></div>
+        <div class="chartwrap tall"><canvas id="pred" role="img" aria-label="Hourly price chart with support and resistance zones, the main predicted path and the alternative path"></canvas></div>
+        <div class="legend"><span><i class="lm"></i>Main path</span><span><i class="la"></i>If the lean fails</span><span><i class="lr"></i>Resistance</span><span><i class="ls"></i>Support</span></div>
+        <div class="score" id="predLv"></div>
+        <div class="note" id="predNote">The paths are a sketch of the levels in play, drawn from the trend, the levels on the chart and, after a scan, the levels the sources named. Price will not follow the line or the timing exactly. It is a prediction, not a guarantee.</div>
+      </section>
     </div>
 
     <div class="col">
@@ -456,14 +465,6 @@ table.bt td.up{color:var(--up)} table.bt td.down{color:var(--down)}
       <div class="note">The scan reads news desks, analysts and public trader posts, then counts how many lean each way. The percentage is how many sources agree. It is not the chance of being right: a majority can be wrong, and old posts are left out only as well as the scan can date them.</div>
     </section>
   </div>
-
-  <section class="panel" id="pPred">
-    <div class="ph"><h2>PREDICTION CHART</h2><i></i><span id="predTag">1-hour candles and the next 24 hours</span></div>
-    <div class="chartwrap tall"><canvas id="pred" role="img" aria-label="Hourly price chart with support and resistance zones, the main predicted path and the alternative path"></canvas></div>
-    <div class="legend"><span><i class="lm"></i>Main path</span><span><i class="la"></i>If the lean fails</span><span><i class="lr"></i>Resistance</span><span><i class="ls"></i>Support</span></div>
-    <div class="score" id="predLv"></div>
-    <div class="note" id="predNote">The paths are a sketch of the levels in play, drawn from the trend, the levels on the chart and, after a scan, the levels the sources named. Price will not follow the line or the timing exactly. It is a prediction, not a guarantee.</div>
-  </section>
 
   <p class="foot">Imagelink reads prices and applies fixed rules. It does not know the future. The confidence score counts how many conditions line up; it is not a win probability. Gold candles come from tokenised gold (PAXG) adjusted to the spot price, so levels can differ from your broker by a small amount. Nothing here is financial advice. <span id="verTxt"></span></p>
 </div>
@@ -2188,7 +2189,7 @@ if (typeof module !== 'undefined') module.exports = IG;
       '<div><strong>' + leanWord(c.dir) + '</strong><small>' + (c.dir ? (c.dir === 1 ? c.up : c.dn) + ' of ' + c.n + ' ' + what + ' agree' : c.scan ? c.n + ' sources, no majority' : 'the daily trend and the shorter trends disagree') + (c.scan ? '' : '. Scan to add outside sources') + '</small></div>' +
       '<div class="split" role="img" aria-label="' + c.up + ' up, ' + c.fl + ' flat, ' + c.dn + ' down"><i class="u" style="width:' + w(c.up) + '%"></i><i class="f" style="width:' + w(c.fl) + '%"></i><i class="d" style="width:' + w(c.dn) + '%"></i></div>' +
       '<div class="splitk"><span>UP ' + c.up + '</span><span>FLAT ' + c.fl + '</span><span>DOWN ' + c.dn + '</span></div>');
-    var o = outlook(id, F); setTxt('maOutT', o.title); setTxt('maOut', o.text);
+    var o = outlook(id, F); setTxt('maOutT', o.title); setTxt('maOut', o.text); setTxt('predOutT', o.title); setTxt('predOut', (F.cons.dir ? F.cons.pct + '% ' + leanWord(F.cons.dir).toLowerCase() + '. ' : '') + o.text);
     if (sc) { if (!DH[id] || DH[id].t !== sc.t) DH[id] = { t: sc.t, h: debateHTML(sc.text) || esc(sc.text || 'The scan returned sources but no written analysis.') }; setHTML('deepOut', DH[id].h); }
     else setHTML('deepOut', 'The written analysis appears here after a scan.');
     setHTML('maSrc', c.rows.map(srcRow).join(''));
