@@ -11,10 +11,3 @@ It also reads the daily trend, the previous day's high and low, and the London a
 - Analysis only. It does not place trades and is not financial advice.
 
 Open `index.html`, or visit the GitHub Pages address of this repository.
-
-## Imagelink Affiliate Hub (`/hub/`)
-
-A separate single-page app for an affiliate business: a directory of affiliate programs, a sign-up form filler, products and promo codes, a sales log with report import, advert results, and an optional AI agent that uses the owner's own Claude API key.
-
-- All records stay in the visitor's browser. Nothing is stored in this repository.
-- It does not connect to any affiliate account. Commission figures are what the owner enters or imports.
