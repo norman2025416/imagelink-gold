@@ -172,6 +172,23 @@ dialog{background:#031220;color:var(--txt);border:1px solid var(--blue);padding:
 dialog::backdrop{background:rgba(1,6,12,.8)}
 dialog .dform{display:flex;flex-direction:column;gap:14px} .dhead{display:flex;align-items:center;justify-content:space-between;gap:10px} dialog{max-height:92vh;overflow-y:auto} dialog h2{margin:0;font-family:var(--disp);letter-spacing:.2em;font-size:16px;color:var(--blue2)}
 .chk{display:flex;gap:10px;align-items:center;min-height:44px}
+.chk input{width:20px;height:20px;flex:none;accent-color:var(--blue)}
+fieldset.alerts{border:1px solid var(--line2);padding:8px 12px 12px;margin:0;display:flex;flex-direction:column;gap:2px}
+fieldset.alerts legend{font-family:var(--mono);font-size:12px;letter-spacing:.14em;color:var(--txt3);padding:0 6px}
+fieldset.alerts .btn{align-self:flex-start;margin-top:6px}
+
+/* pop-up alerts, top right */
+#toasts{position:fixed;top:14px;right:14px;z-index:30;display:flex;flex-direction:column;gap:10px;width:min(340px,calc(100vw - 28px));pointer-events:none}
+.toast{pointer-events:auto;position:relative;display:flex;flex-direction:column;gap:2px;padding:12px 44px 12px 14px;background:#031220;border:1px solid var(--warn);border-left-width:4px;
+  box-shadow:0 10px 30px rgba(0,0,0,.65),0 0 18px rgba(255,159,69,.3);animation:tin .25s ease-out}
+.toast.buy{border-color:var(--up);box-shadow:0 10px 30px rgba(0,0,0,.65),0 0 18px rgba(61,224,168,.3)}
+.toast.sell{border-color:var(--down);box-shadow:0 10px 30px rgba(0,0,0,.65),0 0 18px rgba(255,138,138,.3)}
+.toast small{font-family:var(--mono);font-size:12px;letter-spacing:.14em;color:var(--txt3)}
+.toast b{font-family:var(--disp);font-weight:700;font-size:16px;letter-spacing:.04em;color:#fff}
+.toast span{font-size:14px;color:var(--txt)}
+.toast button{position:absolute;top:2px;right:2px;width:40px;height:40px;background:transparent;border:0;color:var(--txt2);font-size:22px;line-height:1}
+.toast button:hover{color:#fff}
+@keyframes tin{from{opacity:0;transform:translateX(24px)}to{opacity:1;transform:none}}
 
 @media (max-width:1080px){.grid{grid-template-columns:minmax(0,1fr)} .core{order:-1}}
 @media (max-width:560px){.wrap{padding:12px 16px 32px;gap:12px} .top{gap:6px 12px;padding-bottom:10px} .clock{text-align:right} .clock b{font-size:24px} .clock span{display:none} .lights{flex:1 1 100%;gap:10px;font-size:12px} .lights .btn{margin-left:auto;min-height:44px;padding:0 12px} .sessions{flex-wrap:nowrap;overflow-x:auto;max-width:100%} .sessions span{white-space:nowrap} .ph h2{white-space:normal;letter-spacing:.16em} .ladder{grid-template-columns:repeat(2,minmax(0,1fr))} .score{grid-template-columns:repeat(2,minmax(0,1fr))} .chartwrap{height:240px} .brand b{font-size:20px}}
@@ -185,6 +202,8 @@ dialog .dform{display:flex;flex-direction:column;gap:14px} .dhead{display:flex;a
   <p class="foot">Analysis only. This page does not place trades and is not financial advice.</p>
 </div>
 
+<div id="toasts" aria-live="polite"></div>
+
 <div class="wrap">
   <header class="top">
     <div class="brand"><b>IMAGELINK</b><span id="sysline">GOLD INTELLIGENCE SYSTEM</span></div>
@@ -192,6 +211,7 @@ dialog .dform{display:flex;flex-direction:column;gap:14px} .dhead{display:flex;a
     <div class="lights" aria-label="System status">
       <div class="light" id="ltData"><i></i>DATA</div>
       <div class="light" id="ltNews"><i></i>NEWS</div>
+      <div class="light" id="ltAlert"><i></i>ALERTS</div>
       <div class="light" id="ltVoice"><i></i>VOICE</div>
       <div class="light" id="ltAI"><i></i>CLAUDE</div>
       <button class="btn" id="setBtn" type="button">SETTINGS</button>
@@ -355,7 +375,13 @@ dialog .dform{display:flex;flex-direction:column;gap:14px} .dhead{display:flex;a
   <div class="dform" id="setForm">
     <div class="dhead"><h2>SETTINGS</h2><button class="btn" type="button" id="closeBtn" aria-label="Close settings">CLOSE</button></div>
     <div class="field"><label for="fName">WHAT SHOULD I CALL YOU</label><input id="fName" type="text" maxlength="24"></div>
-    <label class="chk"><input id="fVoice" type="checkbox"> Speak the verdict and alerts aloud</label>
+    <fieldset class="alerts"><legend>WHEN THERE IS A SETUP OR AN ALERT</legend>
+      <label class="chk"><input id="fPop" type="checkbox"> Show a pop-up at the top right of the page</label>
+      <label class="chk"><input id="fPing" type="checkbox"> Play a short ping sound</label>
+      <label class="chk"><input id="fVoice" type="checkbox"> Speak it aloud (voice)</label>
+      <label class="chk"><input id="fDesk" type="checkbox"> Also notify me on the computer when this tab is in the background</label>
+      <button class="btn" type="button" id="testBtn">TEST ALERT</button>
+    </fieldset>
     <div class="field"><label for="fBroker">YOUR BROKER'S GOLD PRICE RIGHT NOW (OPTIONAL)</label><input id="fBroker" type="text" inputmode="decimal" placeholder="Lines up the levels with your broker"></div>
     <div class="field"><label for="fKey">CLAUDE API KEY (OPTIONAL, FOR DEEP ANALYSIS)</label><input id="fKey" type="password" autocomplete="off" placeholder="sk-ant-..."></div>
     <div class="field"><label for="fModel">CLAUDE MODEL</label>
@@ -794,6 +820,9 @@ if (typeof module !== 'undefined') module.exports = IG;
   var CFG = LS.get('ig_cfg', {});
   if (!CFG.name) CFG.name = 'Zeus';
   if (CFG.voice === undefined) CFG.voice = true;
+  if (CFG.pop === undefined) CFG.pop = true;
+  if (CFG.ping === undefined) CFG.ping = true;
+  if (CFG.desk === undefined) CFG.desk = false;
   if (!CFG.model) CFG.model = 'claude-sonnet-5-5';
   if (!CFG.brokerOff) CFG.brokerOff = {};
   if (!CFG.key) CFG.key = '';
@@ -822,7 +851,7 @@ if (typeof module !== 'undefined') module.exports = IG;
   }
   function hm(d, tz) { var p = tzParts(d, tz); return ('0' + p.h).slice(-2) + ':' + ('0' + p.m).slice(-2); }
   function dur(min) { min = Math.max(0, Math.round(min)); var h = Math.floor(min / 60), m = min % 60; if (h >= 48) return Math.floor(h / 24) + ' days ' + (h % 24) + ' h'; return h ? h + ' h ' + m + ' min' : m + ' min'; }
-  function ago(t) { return dur((Date.now() - t) / 60000) + ' ago'; }
+  function ago(t) { var m = (Date.now() - t) / 60000; return m < 1 ? 'just now' : dur(m) + ' ago'; }
   function openAt(id, t) {
     if (id === 'BTC') return true;
     var p = tzParts(new Date(t), 'America/New_York');
@@ -1006,7 +1035,7 @@ if (typeof module !== 'undefined') module.exports = IG;
     var c = activeCall(id); if (!c) return;
     var before = c.stage;
     IG.stepCall(c, hi, lo, Date.now(), barT === undefined ? null : barT);
-    if (c.stage !== before) { saveCalls(); if (id === active) announce(true); }
+    if (c.stage !== before) { saveCalls(); if (id === active) announce(true); else if (booted && !c.demo && c.stage !== 'cancelled') alertUser(id, verdict(id)); }
   }
   function manage(id) {
     var st = S[id], an = st.an; if (!an || !an.ok) return;
@@ -1014,7 +1043,7 @@ if (typeof module !== 'undefined') module.exports = IG;
     if (ac && ac.stage === 'setup' && an.lastBreak && an.lastBreak.dir === -ac.dir && an.lastBreak.t > ac.breakT) { ac.stage = 'cancelled'; ac.tEnd = Date.now(); saveCalls(); ac = null; }
     if (!ac && an.setup && marketOpen(id) && st.mode) {
       var k = IG.makeCall(id, an.setup, Date.now(), st.demo);
-      if (!CALLS.some(function (c) { return c.key === k.key; })) { CALLS.push(k); saveCalls(); }
+      if (!CALLS.some(function (c) { return c.key === k.key; })) { CALLS.push(k); saveCalls(); if (id !== active && booted && !k.demo) alertUser(id, verdict(id)); }
     }
   }
 
@@ -1076,7 +1105,7 @@ if (typeof module !== 'undefined') module.exports = IG;
     }
     if (ac) {
       var b = ac.dir === 1, D = b ? 'BUY' : 'SELL';
-      v.cls = b ? 'buy' : 'sell'; v.call = D; v.lv = ac; v.conf = ac.conf; v.parts = ac.parts; v.why = whyCall(id, ac, an);
+      v.alert = true; v.cls = b ? 'buy' : 'sell'; v.call = D; v.lv = ac; v.conf = ac.conf; v.parts = ac.parts; v.why = whyCall(id, ac, an);
       if (ac.stage === 'setup') {
         var near = b ? an.price <= ac.entry + ac.dist * 0.2 : an.price >= ac.entry - ac.dist * 0.2;
         v.head = ac.grade + ' ' + D + ' SETUP';
@@ -1095,7 +1124,7 @@ if (typeof module !== 'undefined') module.exports = IG;
       return v;
     }
     if (lc && lc.tEnd && Date.now() - lc.tEnd < 10 * 60000 && (lc.stage === 'done' || lc.stage === 'stopped' || lc.stage === 'expired')) {
-      v.lv = lc; v.conf = lc.conf; v.parts = lc.parts;
+      v.alert = true; v.lv = lc; v.conf = lc.conf; v.parts = lc.parts;
       if (lc.stage === 'stopped') { v.cls = 'sell'; v.head = 'STOPPED OUT'; v.act = 'Price reached the stop ' + P(id, lc.sl) + '. The setup failed. Wait for the next one.'; v.speak = N + ', the ' + sym.word + ' setup was stopped out.'; }
       else if (lc.stage === 'expired') { v.head = 'SETUP EXPIRED'; v.act = 'Price never came back to ' + P(id, lc.entry) + ', so there was no trade.'; v.speak = 'The ' + sym.word + ' setup expired without an entry.'; }
       else if (lc.result === 'win2') { v.cls = 'buy'; v.head = 'TP2 HIT: SETUP COMPLETE'; v.act = 'Both targets were reached. Close the trade.'; v.speak = N + ', take profit two was hit on ' + sym.word + '. Setup complete.'; }
@@ -1104,12 +1133,12 @@ if (typeof module !== 'undefined') module.exports = IG;
     }
     if (an.reason === 'range') {
       var r = an.range;
-      v.head = 'CONSOLIDATION. STAND DOWN, ' + N.toUpperCase() + '.';
+      v.alert = true; v.head = 'CONSOLIDATION. STAND DOWN, ' + N.toUpperCase() + '.';
       v.act = 'Do not trade inside the range. Buy only after a 5-minute close above ' + P(id, an.buyAbove) + ', sell only after a close below ' + P(id, an.sellBelow) + '.';
       v.why = sym.label.charAt(0) + sym.word.slice(1) + ' has stayed between ' + P(id, r.lo) + ' and ' + P(id, r.hi) + ' for about ' + dur(r.bars * 5) + ' and touched the edges ' + r.touches + ' times. Inside a range, breakouts often fail and stops get hit from both sides. ' + trendTxt(an);
       v.speak = N + ', do not trade now. ' + sym.label.charAt(0) + sym.word.slice(1) + ' is consolidating between ' + P(id, r.lo) + ' and ' + P(id, r.hi) + '.';
     } else if (an.reason === 'news') {
-      v.head = 'NEWS WINDOW. STAND DOWN.';
+      v.alert = true; v.head = 'NEWS WINDOW. STAND DOWN.';
       v.act = 'A high-impact US release is within 15 minutes. No new trade until it has passed.';
       v.why = 'Price can jump through stops around a release, so calls are paused 15 minutes either side. ' + trendTxt(an);
       v.speak = N + ', stand down. High-impact news is close.';
@@ -1176,6 +1205,7 @@ if (typeof module !== 'undefined') module.exports = IG;
     $('ltData').className = 'light ' + (st.raw ? (st.demo ? 'bad' : 'on') : '');
     $('ltNews').className = 'light ' + (newsOK ? 'on' : 'bad');
     $('ltVoice').className = 'light ' + (CFG.voice && 'speechSynthesis' in window ? 'on' : '');
+    $('ltAlert').className = 'light ' + (CFG.pop || CFG.ping || CFG.desk ? 'on' : '');
     $('ltAI').className = 'light ' + (CFG.key ? 'on' : '');
     setTxt('deepState', CFG.key ? 'Ready. Model: ' + CFG.model + '.' : 'No API key saved. Add one in Settings.');
     announce(false);
@@ -1330,13 +1360,48 @@ if (typeof module !== 'undefined') module.exports = IG;
       cur = u; setSpeaking(true); speechSynthesis.speak(u);
     } catch (e) { /* no voice on this device */ }
   }
-  /* speaks the verdict when it changes; force = a tracked call changed stage */
+  var actx = null;
+  function ping() {
+    if (!CFG.ping || !booted) return;
+    try {
+      actx = actx || new (window.AudioContext || window.webkitAudioContext)();
+      if (actx.state === 'suspended') actx.resume();
+      var t = actx.currentTime;
+      [[880, 0], [1320, 0.13]].forEach(function (n) {                 // two short rising notes
+        var o = actx.createOscillator(), g = actx.createGain();
+        o.type = 'sine'; o.frequency.value = n[0];
+        g.gain.setValueAtTime(0.0001, t + n[1]); g.gain.exponentialRampToValueAtTime(0.2, t + n[1] + 0.02); g.gain.exponentialRampToValueAtTime(0.0001, t + n[1] + 0.3);
+        o.connect(g); g.connect(actx.destination); o.start(t + n[1]); o.stop(t + n[1] + 0.32);
+      });
+    } catch (e) { /* no audio on this device */ }
+  }
+  function toast(cls, tag, title, text) {
+    if (!CFG.pop) return;
+    var box = $('toasts'), el = document.createElement('div');
+    function gone() { if (el.parentNode) el.parentNode.removeChild(el); }
+    el.className = 'toast ' + cls; el.setAttribute('role', 'status');
+    el.innerHTML = '<button type="button" aria-label="Dismiss">&times;</button><small>' + esc(tag) + '</small><b>' + esc(title) + '</b><span>' + esc(text) + '</span>';
+    el.querySelector('button').addEventListener('click', gone);
+    box.appendChild(el);
+    while (box.children.length > 3) box.removeChild(box.firstChild);
+    setTimeout(gone, 20000);
+  }
+  function deskNote(title, text) {                                    // only when this tab is not in front
+    if (!CFG.desk || !document.hidden || !('Notification' in window) || Notification.permission !== 'granted') return;
+    try { new Notification('Imagelink: ' + title, { body: text, tag: 'imagelink' }); } catch (e) { /* phones do not allow this from a page */ }
+  }
+  function alertUser(id, v) {
+    var tag = SYMS[id].label + ' \u00b7 ' + hm(new Date(), 'Africa/Johannesburg');
+    toast(v.cls, tag, v.head, v.act); ping(); deskNote(SYMS[id].label + ' ' + v.head, v.act);
+    say(v.speak, 'IMAGELINK \u00b7 ALERT');                          // shows the line; speaks it only when voice is ticked
+  }
+  /* alerts when the verdict changes to something worth acting on; force = a tracked call changed stage */
   function announce(force) {
     var v = verdict(active), key = active + '|' + v.head + '|' + (v.lv ? v.lv.key + v.lv.stage : '');
     if (key === lastKey && !force) return;
     var first = lastKey === ''; lastKey = key;
-    if (!v.speak || !booted || first) return;
-    if (v.speak !== lastSpoken) { lastSpoken = v.speak; say(v.speak, 'IMAGELINK · ALERT'); }
+    if (!v.speak || !v.alert || !booted || first) return;
+    if (v.speak !== lastSpoken) { lastSpoken = v.speak; alertUser(active, v); }
   }
   function ensure(id) { return S[id].raw && Date.now() - S[id].tK < 120000 ? Promise.resolve() : loadTF(id); }
   function marketLine(id) {
@@ -1500,17 +1565,25 @@ if (typeof module !== 'undefined') module.exports = IG;
   $('askIn').addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); ask(); } });
   $('deepBtn').addEventListener('click', deep);
   $('setBtn').addEventListener('click', function () {
-    $('fName').value = CFG.name; $('fVoice').checked = !!CFG.voice; $('fKey').value = CFG.key; $('fModel').value = CFG.model; $('fBroker').value = '';
+    $('fName').value = CFG.name; $('fVoice').checked = !!CFG.voice; $('fPop').checked = !!CFG.pop; $('fPing').checked = !!CFG.ping; $('fDesk').checked = !!CFG.desk; $('fKey').value = CFG.key; $('fModel').value = CFG.model; $('fBroker').value = '';
     document.querySelector('label[for="fBroker"]').textContent = "YOUR BROKER'S " + SYMS[active].label + ' PRICE RIGHT NOW (OPTIONAL)';
     try { $('dlg').showModal(); } catch (e) { $('dlg').setAttribute('open', ''); }
   });
   /* closed by script, not by a form submit: some viewers block form submits and the box would stay open */
   function closeDlg() { var d = $('dlg'); try { d.close(); } catch (e) { /* older browser */ } d.removeAttribute('open'); }
+  function readAlertBoxes() {
+    CFG.voice = $('fVoice').checked; CFG.pop = $('fPop').checked; CFG.ping = $('fPing').checked; CFG.desk = $('fDesk').checked;
+    if (CFG.desk && 'Notification' in window && Notification.permission === 'default') { try { Notification.requestPermission(); } catch (e) { /* not supported */ } }
+  }
+  $('testBtn').addEventListener('click', function () {                // the box closes so the pop-up is not hidden behind it
+    readAlertBoxes(); LS.set('ig_cfg', CFG); closeDlg(); render();
+    alertUser(active, { cls: 'buy', head: 'TEST ALERT', act: 'This is how a setup alert looks and sounds.', speak: 'This is a test alert, ' + who() + '.' });
+  });
   $('closeBtn').addEventListener('click', closeDlg);
   $('cancelBtn').addEventListener('click', closeDlg);
   $('dlg').addEventListener('click', function (e) { if (e.target === $('dlg')) closeDlg(); });      // a click on the dark area outside the box
   $('saveBtn').addEventListener('click', function () {
-    CFG.name = $('fName').value.trim() || 'Zeus'; CFG.voice = $('fVoice').checked; CFG.key = $('fKey').value.trim(); CFG.model = $('fModel').value;
+    CFG.name = $('fName').value.trim() || 'Zeus'; readAlertBoxes(); CFG.key = $('fKey').value.trim(); CFG.model = $('fModel').value;
     var bp = parseFloat(String($('fBroker').value).replace(/[, ]/g, '')), an = S[active].an;
     if (bp > 0 && an && an.ok) CFG.brokerOff[active] = bp - an.price;
     LS.set('ig_cfg', CFG); closeDlg(); render();
