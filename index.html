@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="theme-color" content="#01060C">
-<meta name="ig-build" content="2026-10-11 18:38">
+<meta name="ig-build" content="2026-10-11 19:03">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -899,6 +899,7 @@ var IG = (function () {
       var an = E.analyse({ m5: s5, m15: s15, h1: s60, d1: sD }, { newsMin: null, peersDir: 0 }), act = S.act;
       if (an.ok) {
         if (act && act.stage === 'setup' && an.lastBreak && an.lastBreak.dir === -act.dir && an.lastBreak.t > act.breakT) { act.stage = 'cancelled'; act.tEnd = x.t; act = null; }
+        if (act && act.stage === 'setup' && !act.mkt && (x.o - act.entry) * act.dir > act.dist * 4) { act.stage = 'cancelled'; act.ran = true; act.tEnd = x.t; act = null; }   // price ran away
         if (!act && an.setup && (!opts.isOpen || opts.isOpen(x.t))) {
           var k = E.makeCall(opts.sym || 'X', an.setup, x.t, false);
           if (!S.keys[k.key]) { S.keys[k.key] = 1; S.calls.push(k); act = k; }
@@ -1331,6 +1332,10 @@ if (typeof module !== 'undefined') module.exports = IG;
     var st = S[id], an = st.an; if (!an || !an.ok) return;
     var ac = activeCall(id);
     if (ac && ac.stage === 'setup' && an.lastBreak && an.lastBreak.dir === -ac.dir && an.lastBreak.t > ac.breakT) { ac.stage = 'cancelled'; ac.tEnd = Date.now(); saveCalls(); ac = null; }
+    if (ac && ac.stage === 'setup' && !ac.mkt && (an.price - ac.entry) * ac.dir > ac.dist * 4) {      // price ran away: a retest that far back is no longer the plan
+      ac.stage = 'cancelled'; ac.ran = true; ac.tEnd = Date.now(); saveCalls();
+      logEv(SYMS[id].label + ' setup dropped: price ran ' + fmt(Math.abs(an.price - ac.entry), SYMS[id].dp) + ' away from the entry ' + P(id, ac.entry), 'dim'); ac = null;
+    }
     if (!ac && an.setup && marketOpen(id) && st.mode) {
       var k = IG.makeCall(id, an.setup, Date.now(), st.demo);
       if (!CALLS.some(function (c) { return c.key === k.key; })) { CALLS.push(k); saveCalls(); if (!k.demo) logEv(SYMS[id].label + ' ' + (k.dir === 1 ? 'BUY' : 'SELL') + ' setup, ' + (TYPES[k.type] || k.type) + ', entry ' + P(id, k.entry) + ', confidence ' + k.conf + '%', k.dir === 1 ? 'up' : 'down'); if (id !== active && booted && !k.demo) alertUser(id, verdict(id)); }
