@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="theme-color" content="#01060C">
-<meta name="ig-build" content="2026-10-11 20:40">
+<meta name="ig-build" content="2026-10-11 21:08">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -108,13 +108,13 @@ button{cursor:pointer}
 .src em{font-style:normal;font-family:var(--disp);font-weight:700;font-size:13px;letter-spacing:.1em;color:var(--txt2)} .src.up em{color:var(--up)} .src.down em{color:var(--down)}
 .src b{display:block;font-weight:600;color:#fff;font-size:14px} .src b small{font-weight:400;font-family:var(--mono);font-size:12px;color:var(--txt3);margin-left:8px}
 .src span{display:block;font-size:14px;color:var(--txt);overflow-wrap:anywhere} .src a{color:var(--blue2);font-size:14px;overflow-wrap:anywhere}
-.chartwrap.tall{height:420px}
+.chartwrap.tall{height:460px}
 .legend{display:flex;flex-wrap:wrap;gap:6px 18px;font-family:var(--mono);font-size:12px;color:var(--txt2)}
 .legend i{display:inline-block;width:24px;height:0;border-top:3px solid var(--up);vertical-align:middle;margin-right:6px}
 .legend i.la{border-top:2px dashed var(--txt2)} .legend i.lr{border-top:8px solid rgba(255,138,138,.45)} .legend i.ls{border-top:8px solid rgba(61,224,168,.45)}
 #predLv .chip b{font-size:17px} #predLv .chip b.up{color:var(--up)} #predLv .chip b.down{color:var(--down)}
 fieldset.alerts .field{margin-bottom:8px}
-@media (max-width:560px){.chartwrap.tall{height:340px}}
+@media (max-width:560px){.chartwrap.tall{height:380px}}
 
 /* grid + panels */
 .grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.25fr) minmax(0,1fr);gap:16px;align-items:start}
@@ -258,6 +258,37 @@ table.bt th,table.bt td{padding:6px 6px} table.bt th:not(:first-child),table.bt 
 table.bt tr.g th{text-align:left;background:none;color:var(--blue2);letter-spacing:.14em;font-size:11.5px;padding-top:10px}
 table.bt td.up{color:var(--up)} table.bt td.down{color:var(--down)}
 .read{margin:10px 0 0;color:var(--txt)}
+
+/* layout: one wide chart, wide analysis and log panels, the assistant inside the news box */
+.cbar{display:flex;flex-wrap:wrap;gap:8px 18px;align-items:center;justify-content:space-between}
+.tfs{display:flex;gap:6px}
+.tfs button{min-height:40px;padding:0 14px;background:rgba(6,24,42,.6);border:1px solid var(--line2);color:var(--txt);font-family:var(--disp);font-weight:600;letter-spacing:.14em;font-size:13px}
+.tfs button:hover{border-color:var(--blue)}
+.tfs button[aria-pressed="true"]{border-color:var(--blue);background:rgba(79,209,255,.16);color:#fff;box-shadow:0 0 14px rgba(79,209,255,.4)}
+.cfoot{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);gap:12px;align-items:stretch}
+.cfoot .score{align-items:stretch} .cfoot .chip{display:flex;flex-direction:column;justify-content:center}
+.ma{display:grid;grid-template-columns:minmax(0,.95fr) minmax(0,1.3fr) minmax(0,1fr);gap:18px;align-items:start}
+.mac{display:flex;flex-direction:column;gap:12px;min-width:0}
+.mac .sub{margin:0}
+.srcs.scroll{max-height:232px;overflow-y:auto;padding-right:4px} .srcs.scroll.tall{max-height:470px}
+.logg{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:18px;align-items:start}
+.voice.in{padding:0;border:0;background:none;box-shadow:none;gap:10px 12px}
+.voice.in .mic{width:54px;height:54px} .voice.in .wave{height:44px;gap:3px} .voice.in .wave i{width:4px}
+.voice.in .btn.talk{flex:1 1 120px;min-width:0}
+.voice.in .say{flex:1 1 100%;max-height:172px;overflow-y:auto;padding:8px 10px;border-left:3px solid var(--blue);background:rgba(79,209,255,.07)}
+.voice.in .say p{font-size:15px}
+.voice.in .quick{flex:1 1 100%;gap:6px} .voice.in .quick button{min-height:40px;padding:0 10px;font-size:13px}
+.voice.in .ask{flex:1 1 100%} .voice.in .ask input{flex:1 1 150px;min-width:0}
+#pNews .news{max-height:300px;overflow-y:auto;padding-right:4px}
+@media (max-width:1080px){.ma,.logg,.cfoot{grid-template-columns:minmax(0,1fr)} .srcs.scroll.tall{max-height:320px}}
+@media (max-width:560px){.tfs{flex:1 1 100%} .tfs button{flex:1;padding:0 6px} .legend{gap:4px 12px}}
+.rows.wide{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px 28px} .rows.wide .row{border-bottom:1px solid var(--line2);padding-bottom:6px}
+#structBox .rows{max-width:420px}
+@media (max-width:1080px){.rows.wide{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (max-width:560px){.rows.wide{grid-template-columns:minmax(0,1fr)}}
+/* phones and tablets: verdict first, then the chart, the assistant, the analysis, and the reference panels last */
+@media (max-width:1080px){main.grid{display:contents} .core{order:1} #pChart{order:2} main.grid>.col:last-child{order:3} #pMA{order:4} #pScan{order:5} main.grid>.col:first-child{order:6} #pLog{order:7} .wrap>.foot{order:8}}
+@media (max-width:560px){#pChart .ph,#pMA .ph{flex-wrap:wrap;gap:4px 10px} #pChart .ph i,#pMA .ph i{display:none} #pChart .ph span,#pMA .ph span{flex:1 1 100%}}
 </style>
 </head>
 <body>
@@ -320,6 +351,10 @@ table.bt td.up{color:var(--up)} table.bt td.down{color:var(--down)}
         <div class="note" id="bigRead"></div>
         <div class="note">Context only. It does not change the call or the confidence score.</div>
       </section>
+      <section class="panel" id="pFeed">
+        <div class="ph"><h2>ACTIVITY</h2><i></i><span>THIS SESSION</span></div>
+        <div class="feed" id="feed" aria-live="off"><div class="note">Nothing yet.</div></div>
+      </section>
     </div>
 
     <div class="core">
@@ -379,92 +414,102 @@ table.bt td.up{color:var(--up)} table.bt td.down{color:var(--down)}
         <summary>WHY THIS CONFIDENCE</summary>
         <div class="rows" id="confRows"></div>
       </details>
-
-      <section class="panel" id="pPred">
-        <div class="ph"><h2>PREDICTION CHART</h2><i></i><span id="predTag">1-hour candles and the next 24 hours</span></div>
-        <div class="alert"><small id="predOutT">NEXT 24 HOURS</small><div id="predOut">Waiting for candles.</div></div>
-        <div class="chartwrap tall"><canvas id="pred" role="img" aria-label="Hourly price chart with support and resistance zones, the main predicted path and the alternative path"></canvas></div>
-        <div class="legend"><span><i class="lm"></i>Main path</span><span><i class="la"></i>If the lean fails</span><span><i class="lr"></i>Resistance</span><span><i class="ls"></i>Support</span></div>
-        <div class="score" id="predLv"></div>
-        <div class="note" id="predNote">The paths are a sketch of the levels in play, drawn from the trend, the levels on the chart and, after a scan, the levels the sources named. Price will not follow the line or the timing exactly. It is a prediction, not a guarantee.</div>
-      </section>
     </div>
 
     <div class="col">
       <section class="panel r" id="pNews">
-        <div class="ph"><span>USD</span><i></i><h2>NEWS TODAY</h2></div>
+        <div class="ph"><span>VOICE</span><i></i><h2>ASSISTANT</h2></div>
+        <div class="voice in">
+        <button class="mic" id="micBtn" type="button" aria-label="Tap to talk">
+          <svg width="26" height="26" viewBox="0 0 16 16" aria-hidden="true"><rect x="5.5" y="1.5" width="5" height="8" rx="2.5" fill="none" stroke="#fff" stroke-width="1.4"/><path d="M3 7.5a5 5 0 0 0 10 0M8 12.5v2" fill="none" stroke="#fff" stroke-width="1.4" stroke-linecap="round"/></svg>
+        </button>
+        <div class="wave" id="wave" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+        <button class="btn talk" id="talkBtn" type="button">SPEAK AGAIN</button>
+        <div class="say"><small id="sayTag">IMAGELINK</small><p id="sayTxt">Press start, then tap the microphone or pick a question.</p></div>
+        <div class="quick" id="quick">
+          <button type="button" data-q="morning brief">Morning brief</button>
+          <button type="button" data-q="should i trade now">Should I trade now?</button>
+          <button type="button" data-q="what structure is forming">Structure?</button>
+          <button type="button" data-q="check bitcoin">Check Bitcoin</button>
+          <button type="button" data-q="check silver">Check silver</button>
+          <button type="button" data-q="news today">News today</button>
+          <button type="button" data-q="next move">Next move?</button>
+        </div>
+        <div class="ask" id="askForm">
+          <input id="askIn" type="text" aria-label="Type a question" placeholder="Or type a question" autocomplete="off">
+          <button class="btn solid" type="button" id="askBtn">ASK</button>
+        </div>
+        </div>
+        <h3 class="sub">NEWS TODAY (USD)</h3>
         <div class="news" id="news"><div class="note">Loading the calendar.</div></div>
         <div class="note">Times are South Africa time, with New York time beside them. High-impact releases pause new calls 15 minutes either side.</div>
-      </section>
-      <section class="panel r" id="pScan">
-        <div class="ph"><span>M5</span><i></i><h2>STRUCTURE SCAN</h2></div>
-        <div id="structBox"></div>
-        <div class="rows" id="structRows"></div>
-      </section>
-      <section class="panel r" id="pFeed">
-        <div class="ph"><span>THIS SESSION</span><i></i><h2>ACTIVITY</h2></div>
-        <div class="feed" id="feed" aria-live="off"><div class="note">Nothing yet.</div></div>
       </section>
     </div>
   </main>
 
-  <section class="panel">
-    <div class="ph"><h2>CHART</h2><i></i><span id="chartTag">5-minute candles</span></div>
-    <div class="chartwrap"><canvas id="chart" role="img" aria-label="Price chart with the entry, stop and target lines"></canvas></div>
+  <section class="panel" id="pChart">
+    <div class="ph"><h2>LIVE CHART AND PREDICTION</h2><i></i><span id="chartTag">loading</span></div>
+    <div class="cbar">
+      <div class="tfs" id="tfs" role="group" aria-label="Candle size"><button type="button" data-tf="m5">5 MIN</button><button type="button" data-tf="m15">15 MIN</button><button type="button" data-tf="h1">1 HOUR</button></div>
+      <div class="legend"><span><i class="lm"></i>Main path</span><span><i class="la"></i>If the lean fails</span><span><i class="lr"></i>Resistance</span><span><i class="ls"></i>Support</span></div>
+    </div>
+    <div class="chartwrap tall"><canvas id="chart" role="img" aria-label="Live price chart with the entry, stop and target lines, the support and resistance zones, the main predicted path and the alternative path"></canvas></div>
+    <div class="cfoot">
+      <div class="alert"><small id="predOutT">NEXT 24 HOURS</small><div id="predOut">Waiting for candles.</div></div>
+      <div class="score" id="predLv"></div>
+    </div>
+    <div class="note">The candles are live. The right side is the next 24 hours: a sketch of the levels in play, drawn from the trend, the levels on the chart and, after a scan, the levels the sources named. Price will not follow the line or the timing exactly. It is a prediction, not a guarantee.</div>
   </section>
 
-  <section class="voice">
-    <button class="mic" id="micBtn" type="button" aria-label="Tap to talk">
-      <svg width="26" height="26" viewBox="0 0 16 16" aria-hidden="true"><rect x="5.5" y="1.5" width="5" height="8" rx="2.5" fill="none" stroke="#fff" stroke-width="1.4"/><path d="M3 7.5a5 5 0 0 0 10 0M8 12.5v2" fill="none" stroke="#fff" stroke-width="1.4" stroke-linecap="round"/></svg>
-    </button>
-    <div class="wave" id="wave" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
-    <button class="btn talk" id="talkBtn" type="button">SPEAK AGAIN</button>
-    <div class="say"><small id="sayTag">IMAGELINK</small><p id="sayTxt">Press start, then tap the microphone or pick a question.</p></div>
-    <div class="quick" id="quick">
-      <button type="button" data-q="morning brief">Morning brief</button>
-      <button type="button" data-q="should i trade now">Should I trade now?</button>
-      <button type="button" data-q="what structure is forming">Structure?</button>
-      <button type="button" data-q="check bitcoin">Check Bitcoin</button>
-      <button type="button" data-q="check silver">Check silver</button>
-      <button type="button" data-q="news today">News today</button>
-      <button type="button" data-q="next move">Next move?</button>
-    </div>
-    <div class="ask" id="askForm" style="flex:1 1 100%">
-      <input id="askIn" type="text" aria-label="Type a question" placeholder="Or type a question: gold, silver, bitcoin, structure, news, next move, accuracy" autocomplete="off">
-      <button class="btn solid" type="button" id="askBtn">ASK</button>
-    </div>
+
+  <section class="panel r" id="pScan">
+    <div class="ph"><span>M5</span><i></i><h2>STRUCTURE SCAN</h2></div>
+    <div id="structBox"></div>
+    <div class="rows wide" id="structRows"></div>
   </section>
 
-  <div class="two">
-    <section class="panel">
-      <div class="ph"><h2>CALL LOG AND ACCURACY</h2><i></i><span id="logTag"></span></div>
-      <div class="score">
+  <section class="panel" id="pMA">
+    <div class="ph"><h2>MARKET ANALYSIS</h2><i></i><span id="maTag">NO SCAN YET</span></div>
+    <div class="ma">
+      <div class="mac">
+        <div class="lean" id="maLean"></div>
+        <div class="field"><label for="deepQ">YOUR QUESTION (OPTIONAL)</label><input id="deepQ" type="text" autocomplete="off" placeholder="Example: is this a good place to buy?"></div>
+        <div class="btbar"><button class="btn solid" id="deepBtn" type="button">SCAN THE MARKET NOW</button><span class="note" id="deepState" role="status"></span></div>
+        <h3 class="sub">LATEST HEADLINES</h3>
+        <div class="srcs scroll" id="maHead"><div class="note">Loading headlines.</div></div>
+      </div>
+      <div class="mac">
+        <h3 class="sub">WRITTEN ANALYSIS</h3>
+        <div class="out" id="deepOut" aria-live="polite">The written analysis appears here after a scan.</div>
+      </div>
+      <div class="mac">
+        <h3 class="sub">SOURCES AND WHERE THEY LEAN</h3>
+        <div class="srcs scroll tall" id="maSrc"></div>
+      </div>
+    </div>
+    <div class="note">The scan reads news desks, analysts and public trader posts, then counts how many lean each way. The percentage is how many sources agree. It is not the chance of being right: a majority can be wrong, and old posts are left out only as well as the scan can date them.</div>
+  </section>
+
+  <section class="panel" id="pLog">
+    <div class="ph"><h2>CALL LOG AND ACCURACY</h2><i></i><span id="logTag"></span></div>
+    <div class="logg">
+      <div class="mac">
+        <div class="score">
         <div class="chip"><small>CALLS TODAY</small><b id="sN">0</b></div>
         <div class="chip"><small>SUCCESSFUL</small><b id="sW" class="up">0</b></div>
         <div class="chip"><small>ACCURACY TODAY</small><b id="sP">--</b></div>
         <div class="chip"><small>ALL TIME</small><b id="sAll">--</b></div>
       </div>
-      <div class="note">A call is successful only if price reached take profit 1 before the stop. Calls that never reached the entry are not counted. The log is kept in this browser.</div>
-      <div class="alert"><small>BACKTEST</small><div id="btBox">Waiting for candles.</div>
+        <div class="note">A call is successful only if price reached take profit 1 before the stop. Calls that never reached the entry are not counted. The log is kept in this browser.</div>
+        <div class="tw"><table><thead><tr><th>TIME</th><th>MARKET</th><th>CALL</th><th>ENTRY</th><th>CONF.</th><th>RESULT</th></tr></thead><tbody id="logBody"><tr><td colspan="6">No calls yet.</td></tr></tbody></table></div>
+      </div>
+      <div class="mac">
+        <div class="alert"><small>BACKTEST</small><div id="btBox">Waiting for candles.</div>
         <div class="btbar"><button class="btn" type="button" id="btLong" hidden>TEST 180 DAYS</button><button class="btn" type="button" id="btClear" hidden>CLEAR THE LONG TEST</button><span class="note" id="btStat" role="status"></span></div></div>
-      <div class="note">The backtest replays the same rules over free candle history. It has no news filter and no spread or slippage, so real results will be lower. R is the amount risked on one call: +1R means a gain equal to the risk. Gold history is tokenised gold, which follows gold closely but is not your broker's price.</div>
-      <div class="tw"><table><thead><tr><th>TIME</th><th>MARKET</th><th>CALL</th><th>ENTRY</th><th>CONF.</th><th>RESULT</th></tr></thead><tbody id="logBody"><tr><td colspan="6">No calls yet.</td></tr></tbody></table></div>
-    </section>
-
-    <section class="panel r" id="pMA">
-      <div class="ph"><span id="maTag">RULES ONLY</span><i></i><h2>MARKET ANALYSIS</h2></div>
-      <div class="lean" id="maLean"></div>
-      <div class="alert"><small id="maOutT">NEXT 24 HOURS</small><div id="maOut">Waiting for candles.</div></div>
-      <div class="field"><label for="deepQ">YOUR QUESTION (OPTIONAL)</label><input id="deepQ" type="text" autocomplete="off" placeholder="Example: is this a good place to buy, and what would prove it wrong?"></div>
-      <div class="btbar"><button class="btn solid" id="deepBtn" type="button">SCAN THE MARKET NOW</button><span class="note" id="deepState" role="status"></span></div>
-      <div class="out" id="deepOut" aria-live="polite">The written analysis appears here after a scan.</div>
-      <h3 class="sub">SOURCES AND WHERE THEY LEAN</h3>
-      <div class="srcs" id="maSrc"></div>
-      <h3 class="sub">LATEST HEADLINES</h3>
-      <div class="srcs" id="maHead"><div class="note">Loading headlines.</div></div>
-      <div class="note">The scan reads news desks, analysts and public trader posts, then counts how many lean each way. The percentage is how many sources agree. It is not the chance of being right: a majority can be wrong, and old posts are left out only as well as the scan can date them.</div>
-    </section>
-  </div>
+        <div class="note">The backtest replays the same rules over free candle history. It has no news filter and no spread or slippage, so real results will be lower. R is the amount risked on one call: +1R means a gain equal to the risk. Gold history is tokenised gold, which follows gold closely but is not your broker's price.</div>
+      </div>
+    </div>
+  </section>
 
   <p class="foot">Imagelink reads prices and applies fixed rules. It does not know the future. The confidence score counts how many conditions line up; it is not a win probability. Gold candles come from tokenised gold (PAXG) adjusted to the spot price, so levels can differ from your broker by a small amount. Nothing here is financial advice. <span id="verTxt"></span></p>
 </div>
@@ -1070,6 +1115,7 @@ if (typeof module !== 'undefined') module.exports = IG;
   if (!CFG.gkey) CFG.gkey = '';
   if (CFG.prov !== 'pro' && CFG.prov !== 'free') CFG.prov = CFG.key ? 'pro' : 'free';
   if (CFG.auto === undefined) CFG.auto = true;
+  if (!CFG.tf) CFG.tf = 'm15';
   if (!CFG.brokerOff) CFG.brokerOff = {};
   if (!CFG.key) CFG.key = '';
 
@@ -1631,7 +1677,7 @@ if (typeof module !== 'undefined') module.exports = IG;
     $('ltNews').className = 'light ' + (newsOK ? 'on' : 'bad');
     $('ltVoice').className = 'light ' + (CFG.voice && 'speechSynthesis' in window ? 'on' : '');
     $('ltAlert').className = 'light ' + (CFG.pop || CFG.ping || CFG.desk ? 'on' : '');
-    renderMA(id); drawPred(false);
+    renderMA(id);
     announce(false);
   }
   function renderTrend(an) {
@@ -1767,41 +1813,109 @@ if (typeof module !== 'undefined') module.exports = IG;
       group('BY TIME OF DAY') + line('Busy hours, 13:00 to 19:00', h.busy) + line('Other hours', h.other) +
       '</tbody></table><p class="read">' + esc(btRead(bt)) + (days < 30 && sym.bin ? ' A week is too short to trust: run the ' + LONG_DAYS + '-day test.' : '') + '</p>';
   }
+  /* one chart: live candles on the left, the next 24 hours on the right with the zones and the two paths */
+  var TFS = { m5: ['5-minute', 300000, 3600000], m15: ['15-minute', 900000, 3 * 3600000], h1: ['1-hour', 3600000, 12 * 3600000] }, OPENC = {};
+  function openHour(id, t) { if (id === 'BTC') return true; var k = id + Math.floor(t / 3600000); if (OPENC[k] === undefined) OPENC[k] = openAt(id, t); return OPENC[k]; }
   function drawChart() {
-    var cv = $('chart'), st = S[active], sym = SYMS[active]; if (!st.tf) return;
-    var box = cv.parentNode.getBoundingClientRect(), dpr = window.devicePixelRatio || 1, W = Math.max(280, box.width), H = box.height;
-    cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr);
+    var cv = $('chart'), id = active, st = S[id], sym = SYMS[id]; if (!cv || !st.tf) return;
+    var box = cv.parentNode.getBoundingClientRect(), dpr = window.devicePixelRatio || 1, W = Math.max(280, Math.round(box.width)), H = Math.round(box.height);
+    if (cv.width !== Math.round(W * dpr) || cv.height !== Math.round(H * dpr)) { cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr); }
     var g = cv.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, W, H);
-    var c = st.tf.m5.slice(-Math.min(96, Math.floor((W - 96) / 7))), an = st.an, off = CFG.brokerOff[active] || 0;
-    var lv = activeCall(active), lines = [];
-    if (lv) lines.push(['ENTRY', lv.entry, '#4FD1FF'], ['STOP', lv.sl, '#FF8A8A'], ['TP1', lv.tp1, '#3DE0A8'], ['TP2', lv.tp2, '#3DE0A8']);
-    else if (an && an.ok) {
-      var pl = verdict(active).plan, ba = pl ? pl.buyAbove : an.buyAbove, sb = pl ? pl.sellBelow : an.sellBelow;
-      if (ba !== null) lines.push(['BUY ABOVE', ba, '#3DE0A8']); if (sb !== null) lines.push(['SELL BELOW', sb, '#FF8A8A']);
-      if (pl) lines.push(['FRI CLOSE', pl.close, '#4FD1FF']);
+    g.font = '12px "IBM Plex Mono", monospace'; g.textBaseline = 'middle'; g.textAlign = 'left'; g.lineWidth = 1;
+    var an = st.an, ok = an && an.ok, F = forecastFor(id), f = F ? F.f : null, off = CFG.brokerOff[id] || 0, small = W < 640;
+    var tfk = TFS[CFG.tf] && st.tf[CFG.tf] && st.tf[CFG.tf].length > 20 ? CFG.tf : 'm5', TF = TFS[tfk], closed = !marketOpen(id);
+    var RW = small ? 108 : 172, BH = 22, PW = W - RW, PH = H - BH, xNow = f ? Math.round(PW * (small ? 0.58 : 0.7)) : PW;
+    var all = st.tf[tfk], c = all.slice(-Math.max(20, Math.min(160, Math.floor(xNow / (small ? 6 : 8)))));
+    var px = ok ? an.price : c[c.length - 1].c;
+    if (ok && tfk !== 'm5') { var lc = c[c.length - 1]; lc = c[c.length - 1] = { t: lc.t, o: lc.o, h: Math.max(lc.h, px), l: Math.min(lc.l, px), c: px }; }   // the forming candle ends at the live price
+    var cw = xNow / c.length, hi = -Infinity, lo = Infinity;
+    c.forEach(function (x) { if (x.h > hi) hi = x.h; if (x.l < lo) lo = x.l; });
+    var lv = activeCall(id), lines = [], main = null, alt = null;
+    if (lv) lines.push(['ENTRY', 'EN', lv.entry, '#4FD1FF', 1], ['STOP', 'SL', lv.sl, '#FF9F45', 1], ['TP1', 'TP1', lv.tp1, '#7FD9FF', 1], ['TP2', 'TP2', lv.tp2, '#7FD9FF', 1]);
+    else if (ok) {
+      var pl = verdict(id).plan, ba = pl ? pl.buyAbove : an.buyAbove, sb = pl ? pl.sellBelow : an.sellBelow;
+      if (ba !== null) lines.push(['BUY ABOVE', 'BUY', ba, '#B4C6D8', 0]); if (sb !== null) lines.push(['SELL BELOW', 'SELL', sb, '#B4C6D8', 0]);
+      if (pl) lines.push(['FRI CLOSE', 'FRI', pl.close, '#4FD1FF', 0]);
     }
-    var hi = -Infinity, lo = Infinity; c.forEach(function (x) { if (x.h > hi) hi = x.h; if (x.l < lo) lo = x.l; });
-    lines.forEach(function (l) { if (l[1] > hi) hi = l[1]; if (l[1] < lo) lo = l[1]; });
-    var pad = (hi - lo) * 0.08 || 1; hi += pad; lo -= pad;
-    var RW = 92, cw = (W - RW) / c.length, y = function (p) { return (hi - p) / (hi - lo) * (H - 16) + 8; };
-    g.font = '12px "IBM Plex Mono", monospace'; g.textBaseline = 'middle';
-    if (an && an.ok && an.range && !lv) { g.fillStyle = 'rgba(255,159,69,.10)'; g.fillRect(0, y(an.range.hi), W - RW, y(an.range.lo) - y(an.range.hi)); }
-    if (an && an.ok && an.orderBlock && !lv) {
-      var ob = an.orderBlock, x0 = 0;
-      for (var q = 0; q < c.length; q++) if (c[q].t === ob.t) x0 = q * cw;
-      if (ob.top < hi && ob.bot > lo) { g.fillStyle = ob.dir === 1 ? 'rgba(61,224,168,.14)' : 'rgba(255,138,138,.14)'; g.fillRect(x0, y(ob.top), W - RW - x0, Math.max(2, y(ob.bot) - y(ob.top))); }
+    lines.forEach(function (l) { if (l[4]) { if (l[2] > hi) hi = l[2]; if (l[2] < lo) lo = l[2]; } });
+    if (f) {
+      main = f.main.map(function (p, k) { return k ? p : [0, px]; }); alt = f.alt.map(function (p, k) { return k ? p : [0, px]; });
+      main.concat(alt).forEach(function (p) { if (p[1] > hi) hi = p[1]; if (p[1] < lo) lo = p[1]; });
+      f.res.concat(f.sup).forEach(function (z) { if (z.p > hi) hi = z.p; if (z.p < lo) lo = z.p; });
+    }
+    var pad = (hi - lo) * 0.07 || 1; hi += pad; lo -= pad;
+    var y = function (p) { return (hi - p) / (hi - lo) * (PH - 12) + 6; };
+    if (f) { g.fillStyle = 'rgba(79,209,255,.05)'; g.fillRect(xNow, 0, PW - xNow, PH); }
+    if (ok && an.range && !lv && an.range.hi < hi && an.range.lo > lo) { g.fillStyle = 'rgba(255,159,69,.09)'; g.fillRect(0, y(an.range.hi), xNow, y(an.range.lo) - y(an.range.hi)); }
+    var zh = f ? Math.max(4, Math.min(14, f.atr * 0.25 / (hi - lo) * (PH - 12))) : 0;
+    if (f) {
+      f.res.forEach(function (z) { g.fillStyle = 'rgba(255,138,138,.17)'; g.fillRect(0, y(z.p) - zh / 2, PW, zh); });
+      f.sup.forEach(function (z) { g.fillStyle = 'rgba(61,224,168,.17)'; g.fillRect(0, y(z.p) - zh / 2, PW, zh); });
     }
     c.forEach(function (x, i) {
       var up = x.c >= x.o, cx = i * cw + cw / 2;
+      g.globalAlpha = openHour(id, x.t) ? 1 : 0.4;
       g.strokeStyle = g.fillStyle = up ? '#3DE0A8' : '#E0605E';
       g.beginPath(); g.moveTo(cx, y(x.h)); g.lineTo(cx, y(x.l)); g.stroke();
       var top = y(Math.max(x.o, x.c)), bot = y(Math.min(x.o, x.c)); g.fillRect(cx - cw * 0.32, top, cw * 0.64, Math.max(1, bot - top));
     });
+    g.globalAlpha = 1;
+    /* the right-hand labels: levels, the live price and the call or plan lines. A line outside the picture is pinned to the edge with an arrow. */
+    var labs = [];
     lines.forEach(function (l) {
-      var yy = y(l[1]); g.strokeStyle = l[2]; g.setLineDash([6, 5]); g.beginPath(); g.moveTo(0, yy); g.lineTo(W - RW, yy); g.stroke(); g.setLineDash([]);
-      g.fillStyle = l[2]; g.fillText(l[0], W - RW + 6, yy - 7); g.fillStyle = '#fff'; g.fillText(fmt(l[1] + off, sym.dp), W - RW + 6, yy + 7);
+      var out = l[2] > hi ? 1 : l[2] < lo ? -1 : 0, yy = out === 1 ? 8 : out === -1 ? PH - 8 : y(l[2]);
+      if (!out) { g.strokeStyle = l[3]; g.setLineDash([6, 5]); g.beginPath(); g.moveTo(0, yy); g.lineTo(PW, yy); g.stroke(); g.setLineDash([]); }
+      labs.push({ tag: (small ? l[1] : l[0]) + (out === 1 ? ' ↑' : out === -1 ? ' ↓' : ''), p: l[2], col: l[3], y0: yy, y: yy });
     });
-    var last = c[c.length - 1]; g.fillStyle = '#fff'; g.fillRect(0, y(last.c), W - RW, 0.5);
+    if (f) {
+      labs.push({ tag: 'R2', p: f.res[1].p, col: '#FF8A8A' }, { tag: 'R1', p: f.res[0].p, col: '#FF8A8A' }, { tag: 'S1', p: f.sup[0].p, col: '#3DE0A8' }, { tag: 'S2', p: f.sup[1].p, col: '#3DE0A8' });
+      g.strokeStyle = 'rgba(255,255,255,.55)'; g.setLineDash([3, 4]); g.beginPath(); g.moveTo(xNow, 0); g.lineTo(xNow, PH); g.stroke(); g.setLineDash([]);
+      var fw = (PW - xNow - 12) / f.hours;
+      var xy = function (p) { return [xNow + p[0] * fw, y(p[1])]; };
+      var curve = function (q) {
+        g.beginPath(); g.moveTo(q[0][0], q[0][1]);
+        for (var k = 1; k < q.length - 1; k++) g.quadraticCurveTo(q[k][0], q[k][1], (q[k][0] + q[k + 1][0]) / 2, (q[k][1] + q[k + 1][1]) / 2);
+        g.lineTo(q[q.length - 1][0], q[q.length - 1][1]); g.stroke();
+      };
+      var head = function (q, col) {
+        var e = q[q.length - 1], b = q[q.length - 2], a = Math.atan2(e[1] - b[1], e[0] - b[0]);
+        g.fillStyle = col; g.beginPath(); g.moveTo(e[0] + 9 * Math.cos(a), e[1] + 9 * Math.sin(a));
+        g.lineTo(e[0] + 7 * Math.cos(a + 2.5), e[1] + 7 * Math.sin(a + 2.5)); g.lineTo(e[0] + 7 * Math.cos(a - 2.5), e[1] + 7 * Math.sin(a - 2.5)); g.closePath(); g.fill();
+      };
+      g.lineJoin = g.lineCap = 'round';
+      var qa = alt.map(xy), qm = main.map(xy), col = f.dir === 1 ? '#3DE0A8' : f.dir === -1 ? '#FF8A8A' : '#4FD1FF';
+      g.strokeStyle = '#B4C6D8'; g.lineWidth = 1.6; g.setLineDash([6, 6]); curve(qa); g.setLineDash([]); head(qa, '#B4C6D8');
+      g.shadowColor = col; g.shadowBlur = 10; g.strokeStyle = col; g.lineWidth = 3; curve(qm); g.shadowBlur = 0; head(qm, col);
+      g.lineWidth = 1; g.lineCap = 'butt';
+      g.fillStyle = '#DCEBFA'; g.fillText(closed ? 'OPENS ' + openWhen(id).toUpperCase() : 'NEXT 24 HOURS', Math.min(xNow + 6, PW - 132), 11);
+      if (f.wrong !== null) { g.fillStyle = '#FF9F45'; g.fillText('LEAN IS WRONG ' + (f.dir === 1 ? 'BELOW' : 'ABOVE'), 6, y(f.wrong) + (f.dir === 1 ? 1 : -1) * (zh / 2 + 9)); }
+    }
+    labs.push({ tag: 'NOW', p: px, col: '#fff' });
+    labs.forEach(function (l) { if (l.y0 === undefined) l.y0 = l.y = y(l.p); });
+    g.fillStyle = '#fff'; g.fillRect(0, y(px), xNow, 0.5);
+    labs.sort(function (a, b) { return a.y - b.y; });
+    var i; for (i = 1; i < labs.length; i++) if (labs[i].y - labs[i - 1].y < 15) labs[i].y = labs[i - 1].y + 15;
+    for (i = labs.length - 1; i >= 0; i--) { var mx = PH - 8 - (labs.length - 1 - i) * 15; if (labs[i].y > mx) labs[i].y = mx; }
+    labs.forEach(function (l) {
+      g.strokeStyle = l.col; g.beginPath(); g.moveTo(PW, l.y0); g.lineTo(PW + 5, l.y); g.stroke();
+      g.fillStyle = l.col; g.fillText(l.tag + ' ' + fmt(l.p + off, sym.dp), PW + 8, l.y);
+    });
+    /* time axis in South Africa time (UTC+2, no summer time) */
+    g.fillStyle = '#8FA6BF'; g.textAlign = 'center';
+    var lastX = -99;
+    c.forEach(function (x, k) {
+      var cx = k * cw + cw / 2, lt = x.t + 7200000;
+      if (lt % TF[2] !== 0 || cx - lastX < 78 || cx < 38 || cx > xNow - 34) return;
+      var d = new Date(lt), hh = d.getUTCHours();
+      lastX = cx; g.fillText((tfk === 'h1' || hh === 0 ? DAYS[d.getUTCDay()].slice(0, 3) + ' ' : '') + ('0' + hh).slice(-2) + ':00', cx, PH + 12);
+    });
+    if (f) [6, 12, 18, 24].forEach(function (h) { var w6 = (PW - xNow - 12) / 4; if ((w6 < 44 && h % 12) || (w6 < 30 && h !== 24)) return; g.fillText('+' + h + ' h', Math.min(xNow + h * (PW - xNow - 12) / 24, PW - 18), PH + 12); });
+    g.textAlign = 'left';
+    setHTML('predLv', f ? [['RESISTANCE 2', f.res[1]], ['RESISTANCE 1', f.res[0]], ['SUPPORT 1', f.sup[0]], ['SUPPORT 2', f.sup[1]]].map(function (z, k) {
+      return '<div class="chip"><small>' + z[0] + '</small><b class="' + (k < 2 ? 'down' : 'up') + '">' + P(id, z[1].p) + '</b><em>' + esc(z[1].tag) + '</em></div>';
+    }).join('') : '');
+    setTxt('chartTag', TF[0] + ' candles' + (st.demo ? ', demo data' : streaming(id) ? ', live' : '') + (f ? '. Main path ' + (f.dir === 1 ? 'up' : f.dir === -1 ? 'down' : 'sideways') + (F.cons.dir ? ', ' + F.cons.pct + '% of ' + (F.cons.scan ? 'sources' : 'readings') + ' agree' : '') : ''));
+    document.querySelectorAll('#tfs button').forEach(function (b) { var on = b.getAttribute('data-tf') === tfk; if ((b.getAttribute('aria-pressed') === 'true') !== on) b.setAttribute('aria-pressed', on ? 'true' : 'false'); });
   }
 
   /* ---------- voice ---------- */
@@ -1948,7 +2062,7 @@ if (typeof module !== 'undefined') module.exports = IG;
     SILVER: { re: /silver|xag/i,       q: 'silver price XAGUSD', name: 'silver (XAGUSD)', tw: ['XAGUSD', 'SLV'] },
     BTC:    { re: /bitcoin|btc/i,      q: 'bitcoin price BTC', name: 'Bitcoin (BTCUSD)', tw: ['BTC.X'] }
   };
-  var HEAD = {}, MOOD = {}, SCAN = LS.get('ig_scan', {}), FC = {}, DH = {}, scanning = false, predKey = '', autoT = 0, msgT = 0;
+  var HEAD = {}, MOOD = {}, SCAN = LS.get('ig_scan', {}), FC = {}, DH = {}, scanning = false, autoT = 0, msgT = 0;
 
   /* free headlines: two public news feeds, read through a relay because the feeds do not allow a direct call from a page */
   function rss(xml) {
@@ -2189,7 +2303,7 @@ if (typeof module !== 'undefined') module.exports = IG;
       '<div><strong>' + leanWord(c.dir) + '</strong><small>' + (c.dir ? (c.dir === 1 ? c.up : c.dn) + ' of ' + c.n + ' ' + what + ' agree' : c.scan ? c.n + ' sources, no majority' : 'the daily trend and the shorter trends disagree') + (c.scan ? '' : '. Scan to add outside sources') + '</small></div>' +
       '<div class="split" role="img" aria-label="' + c.up + ' up, ' + c.fl + ' flat, ' + c.dn + ' down"><i class="u" style="width:' + w(c.up) + '%"></i><i class="f" style="width:' + w(c.fl) + '%"></i><i class="d" style="width:' + w(c.dn) + '%"></i></div>' +
       '<div class="splitk"><span>UP ' + c.up + '</span><span>FLAT ' + c.fl + '</span><span>DOWN ' + c.dn + '</span></div>');
-    var o = outlook(id, F); setTxt('maOutT', o.title); setTxt('maOut', o.text); setTxt('predOutT', o.title); setTxt('predOut', (F.cons.dir ? F.cons.pct + '% ' + leanWord(F.cons.dir).toLowerCase() + '. ' : '') + o.text);
+    var o = outlook(id, F); setTxt('predOutT', o.title); setTxt('predOut', (F.cons.dir ? F.cons.pct + '% ' + leanWord(F.cons.dir).toLowerCase() + '. ' : '') + o.text);
     if (sc) { if (!DH[id] || DH[id].t !== sc.t) DH[id] = { t: sc.t, h: debateHTML(sc.text) || esc(sc.text || 'The scan returned sources but no written analysis.') }; setHTML('deepOut', DH[id].h); }
     else setHTML('deepOut', 'The written analysis appears here after a scan.');
     setHTML('maSrc', c.rows.map(srcRow).join(''));
@@ -2260,7 +2374,7 @@ if (typeof module !== 'undefined') module.exports = IG;
       if (a[1] && a[1].ok) snap.trader_posts_last_3_days = { tagged_bullish: a[1].bull, tagged_bearish: a[1].bear, posts_read: a[1].n };
       return askAI(scanPrompt(id, price), 'Readings (JSON):\n' + JSON.stringify(snap) + (q ? '\n\nThe trader also asks, and wants it answered inside VERDICT: ' + q : ''), true);
     }).then(function (r) {
-      var sc = parseScan(r, price); SCAN[id] = sc; LS.set('ig_scan', SCAN); FC[id] = null; predKey = '';
+      var sc = parseScan(r, price); SCAN[id] = sc; LS.set('ig_scan', SCAN); FC[id] = null;
       scanning = false; render();
       var F = forecastFor(id);
       logEv(SYMS[id].label + ' market scan done: ' + sc.sources.length + ' sources' + (F ? ', ' + leanWord(F.cons.dir).toLowerCase() : ''), F && F.cons.dir === 1 ? 'up' : F && F.cons.dir === -1 ? 'down' : '');
@@ -2272,79 +2386,6 @@ if (typeof module !== 'undefined') module.exports = IG;
     if (!booted || !CFG.auto || !prov() || scanning || document.hidden || Date.now() - autoT < 1800000) return;
     var an = S[active].an, sc = scanOf(active); if (!an || !an.ok || S[active].demo || (sc && Date.now() - sc.t < 4 * 3600000)) return;
     autoT = Date.now(); scan(true);
-  }
-
-  /* the prediction chart: hourly candles on the left, the zones and the two paths on the right */
-  function drawPred(force) {
-    var cv = $('pred'), id = active, st = S[id], sym = SYMS[id]; if (!cv) return;
-    var F = forecastFor(id), box = cv.parentNode.getBoundingClientRect(), W = Math.max(280, Math.round(box.width)), H = Math.round(box.height);
-    var key = id + '|' + (F ? F.k : 'none') + '|' + W + 'x' + H;
-    if (!force && key === predKey) return;
-    predKey = key;
-    var dpr = window.devicePixelRatio || 1; cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr);
-    var g = cv.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, W, H);
-    g.font = '12px "IBM Plex Mono", monospace'; g.textBaseline = 'middle'; g.textAlign = 'left'; g.lineWidth = 1;
-    if (!F) { g.fillStyle = '#8FA6BF'; g.fillText('Waiting for candles.', 12, H / 2); setHTML('predLv', ''); return; }
-    var f = F.f, off = CFG.brokerOff[id] || 0, RW = 104, BH = 22, PW = W - RW, PH = H - BH, closed = !marketOpen(id);
-    var xNow = Math.round(PW * (W < 520 ? 0.52 : 0.62)), n = Math.max(20, Math.min(72, Math.floor(xNow / 6))), c = st.tf.h1.slice(-n);
-    var cw = xNow / c.length, fw = (PW - xNow - 12) / f.hours, hi = -Infinity, lo = Infinity;
-    c.forEach(function (x) { if (x.h > hi) hi = x.h; if (x.l < lo) lo = x.l; });
-    f.main.concat(f.alt).forEach(function (p) { if (p[1] > hi) hi = p[1]; if (p[1] < lo) lo = p[1]; });
-    f.res.concat(f.sup).forEach(function (z) { if (z.p > hi) hi = z.p; if (z.p < lo) lo = z.p; });
-    var pad = (hi - lo) * 0.07 || 1; hi += pad; lo -= pad;
-    var y = function (p) { return (hi - p) / (hi - lo) * (PH - 12) + 6; };
-    g.fillStyle = 'rgba(79,209,255,.05)'; g.fillRect(xNow, 0, PW - xNow, PH);
-    var zh = Math.max(4, f.atr * 0.25 / (hi - lo) * (PH - 12));
-    f.res.forEach(function (z) { g.fillStyle = 'rgba(255,138,138,.17)'; g.fillRect(0, y(z.p) - zh / 2, PW, zh); });
-    f.sup.forEach(function (z) { g.fillStyle = 'rgba(61,224,168,.17)'; g.fillRect(0, y(z.p) - zh / 2, PW, zh); });
-    c.forEach(function (x, i) {
-      var up = x.c >= x.o, cx = i * cw + cw / 2;
-      g.globalAlpha = id !== 'BTC' && !openAt(id, x.t) ? 0.35 : 1;
-      g.strokeStyle = g.fillStyle = up ? '#3DE0A8' : '#E0605E';
-      g.beginPath(); g.moveTo(cx, y(x.h)); g.lineTo(cx, y(x.l)); g.stroke();
-      var top = y(Math.max(x.o, x.c)), bot = y(Math.min(x.o, x.c)); g.fillRect(cx - cw * 0.32, top, cw * 0.64, Math.max(1, bot - top));
-    });
-    g.globalAlpha = 1;
-    g.strokeStyle = 'rgba(255,255,255,.55)'; g.setLineDash([3, 4]); g.beginPath(); g.moveTo(xNow, 0); g.lineTo(xNow, PH); g.stroke(); g.setLineDash([]);
-    function xy(p) { return [xNow + p[0] * fw, y(p[1])]; }
-    function curve(q) {
-      g.beginPath(); g.moveTo(q[0][0], q[0][1]);
-      for (var i = 1; i < q.length - 1; i++) g.quadraticCurveTo(q[i][0], q[i][1], (q[i][0] + q[i + 1][0]) / 2, (q[i][1] + q[i + 1][1]) / 2);
-      g.lineTo(q[q.length - 1][0], q[q.length - 1][1]); g.stroke();
-    }
-    function head(q, col) {
-      var e = q[q.length - 1], b = q[q.length - 2], a = Math.atan2(e[1] - b[1], e[0] - b[0]);
-      g.fillStyle = col; g.beginPath(); g.moveTo(e[0] + 9 * Math.cos(a), e[1] + 9 * Math.sin(a));
-      g.lineTo(e[0] + 7 * Math.cos(a + 2.5), e[1] + 7 * Math.sin(a + 2.5)); g.lineTo(e[0] + 7 * Math.cos(a - 2.5), e[1] + 7 * Math.sin(a - 2.5)); g.closePath(); g.fill();
-    }
-    g.lineJoin = g.lineCap = 'round';
-    var qa = f.alt.map(xy), qm = f.main.map(xy), col = f.dir === 1 ? '#3DE0A8' : f.dir === -1 ? '#FF8A8A' : '#4FD1FF';
-    g.strokeStyle = '#B4C6D8'; g.lineWidth = 1.6; g.setLineDash([6, 6]); curve(qa); g.setLineDash([]); head(qa, '#B4C6D8');
-    g.shadowColor = col; g.shadowBlur = 10; g.strokeStyle = col; g.lineWidth = 3; curve(qm); g.shadowBlur = 0; head(qm, col);
-    g.lineWidth = 1; g.lineCap = 'butt';
-    g.fillStyle = '#DCEBFA'; g.fillText(closed ? 'OPENS ' + openWhen(id).toUpperCase() : 'NOW', Math.min(xNow + 6, PW - 128), 11);
-    if (f.wrong !== null) { g.fillStyle = '#FF9F45'; g.fillText('LEAN IS WRONG ' + (f.dir === 1 ? 'BELOW' : 'ABOVE'), 6, y(f.wrong) + (f.dir === 1 ? 1 : -1) * (zh / 2 + 9)); }
-    var labs = [['R2', f.res[1].p, '#FF8A8A'], ['R1', f.res[0].p, '#FF8A8A'], ['NOW', f.price, '#fff'], ['S1', f.sup[0].p, '#3DE0A8'], ['S2', f.sup[1].p, '#3DE0A8']].map(function (l) { return { tag: l[0], p: l[1], col: l[2], y0: y(l[1]), y: y(l[1]) }; });
-    labs.sort(function (a, b) { return a.y - b.y; });
-    var i; for (i = 1; i < labs.length; i++) if (labs[i].y - labs[i - 1].y < 15) labs[i].y = labs[i - 1].y + 15;
-    for (i = labs.length - 1; i >= 0; i--) { var mx = PH - 8 - (labs.length - 1 - i) * 15; if (labs[i].y > mx) labs[i].y = mx; }
-    labs.forEach(function (l) {
-      g.strokeStyle = l.col; g.beginPath(); g.moveTo(PW, l.y0); g.lineTo(PW + 5, l.y); g.stroke();
-      g.fillStyle = l.col; g.fillText(l.tag + ' ' + fmt(l.p + off, sym.dp), PW + 8, l.y);
-    });
-    g.fillStyle = '#8FA6BF'; g.textAlign = 'center';
-    var lastX = -99;
-    c.forEach(function (x, k) {
-      var p = tzParts(new Date(x.t), 'Africa/Johannesburg'), cx = k * cw + cw / 2;
-      if (p.h % 12 !== 0 || cx - lastX < 76 || cx < 38 || cx > xNow - 34) return;
-      lastX = cx; g.fillText(DAYS[p.wd].slice(0, 3) + ' ' + ('0' + p.h).slice(-2) + ':00', cx, PH + 12);
-    });
-    [6, 12, 18, 24].forEach(function (h) { if (fw * 6 < 44 && h % 12) return; g.fillText('+' + h + ' h', Math.min(xNow + h * fw, PW - 18), PH + 12); });
-    g.textAlign = 'left';
-    setHTML('predLv', [['RESISTANCE 2', f.res[1]], ['RESISTANCE 1', f.res[0]], ['SUPPORT 1', f.sup[0]], ['SUPPORT 2', f.sup[1]]].map(function (z, k) {
-      return '<div class="chip"><small>' + z[0] + '</small><b class="' + (k < 2 ? 'down' : 'up') + '">' + P(id, z[1].p) + '</b><em>' + esc(z[1].tag) + '</em></div>';
-    }).join(''));
-    setTxt('predTag', (closed ? 'From the open. ' : '') + 'Main path ' + (f.dir === 1 ? 'up' : f.dir === -1 ? 'down' : 'sideways') + (F.cons.dir ? ', ' + F.cons.pct + '% of ' + (F.cons.scan ? 'sources' : 'readings') + ' agree' : ''));
   }
 
   /* ---------- clock, sessions, timers ---------- */
@@ -2540,7 +2581,8 @@ if (typeof module !== 'undefined') module.exports = IG;
     var an = S[active].an; say(greet() + ' ' + (an && an.ok ? marketLine(active) : 'I am still loading the market data.') + (newsOK && !verdict(active).closed ? ' ' + newsLine() : ''));
     lastKey = ''; announce(false); setTimeout(autoScan, 6000);
   }
-  window.addEventListener('resize', function () { drawChart(); drawPred(true); });
+  window.addEventListener('resize', drawChart);
+  $('tfs').addEventListener('click', function (e) { var k = e.target.getAttribute && e.target.getAttribute('data-tf'); if (k && TFS[k]) { CFG.tf = k; LS.set('ig_cfg', CFG); drawChart(); } });
   $('pipe').addEventListener('click', function (e) {
     var t = e.target; while (t && t !== this && !(t.getAttribute && t.getAttribute('data-go'))) t = t.parentNode;
     var go = t && t.getAttribute && t.getAttribute('data-go'); if (!go) return;
