@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="theme-color" content="#01060C">
-<meta name="ig-build" content="2026-10-11 15:46">
+<meta name="ig-build" content="2026-10-11 16:18">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -226,6 +226,13 @@ fieldset.alerts .btn{align-self:flex-start;margin-top:6px}
 
 @media (max-width:1080px){.grid{grid-template-columns:minmax(0,1fr)} .core{order:-1}}
 @media (max-width:560px){.wrap{padding:12px 16px 32px;gap:12px} .top{gap:6px 12px;padding-bottom:10px} .clock{text-align:right} .clock b{font-size:24px} .clock span{display:none} .lights{flex:1 1 100%;gap:10px;font-size:12px} .lights .btn{margin-left:auto;min-height:44px;padding:0 12px} .sessions{flex-wrap:nowrap;overflow-x:auto;max-width:100%} .sessions span{white-space:nowrap} .ph h2{white-space:normal;letter-spacing:.16em} .ladder{grid-template-columns:repeat(2,minmax(0,1fr))} .score{grid-template-columns:repeat(2,minmax(0,1fr))} .chartwrap{height:240px} .brand b{font-size:20px}}
+/* backtest splits */
+.btbar{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center;margin-top:10px}
+table.bt{min-width:0;margin-top:10px;font-size:12.5px}
+table.bt th,table.bt td{padding:6px 6px} table.bt th:not(:first-child),table.bt td:not(:first-child){text-align:right;white-space:nowrap}
+table.bt tr.g th{text-align:left;background:none;color:var(--blue2);letter-spacing:.14em;font-size:11.5px;padding-top:10px}
+table.bt td.up{color:var(--up)} table.bt td.down{color:var(--down)}
+.read{margin:10px 0 0;color:var(--txt)}
 </style>
 </head>
 <body>
@@ -403,8 +410,9 @@ fieldset.alerts .btn{align-self:flex-start;margin-top:6px}
         <div class="chip"><small>ALL TIME</small><b id="sAll">--</b></div>
       </div>
       <div class="note">A call is successful only if price reached take profit 1 before the stop. Calls that never reached the entry are not counted. The log is kept in this browser.</div>
-      <div class="alert"><small>BACKTEST</small><span id="btBox">Waiting for candles.</span></div>
-      <div class="note">The backtest replays the same rules over free candle history with no news filter. R is the amount risked on one call: +1R means a gain equal to the risk. A week is a small sample, so read it as a sanity check, not a promise.</div>
+      <div class="alert"><small>BACKTEST</small><div id="btBox">Waiting for candles.</div>
+        <div class="btbar"><button class="btn" type="button" id="btLong" hidden>TEST 180 DAYS</button><span class="note" id="btStat" role="status"></span></div></div>
+      <div class="note">The backtest replays the same rules over free candle history. It has no news filter and no spread or slippage, so real results will be lower. R is the amount risked on one call: +1R means a gain equal to the risk. Gold history is tokenised gold, which follows gold closely but is not your broker's price.</div>
       <div class="tw"><table><thead><tr><th>TIME</th><th>MARKET</th><th>CALL</th><th>ENTRY</th><th>CONF.</th><th>RESULT</th></tr></thead><tbody id="logBody"><tr><td colspan="6">No calls yet.</td></tr></tbody></table></div>
     </section>
 
@@ -648,10 +656,49 @@ var IG = (function () {
     return best.failed ? null : best;
   };
 
+  /* ---- sessions ---- */
+  var _fmt = {}, _off = {};
+  function tzOff(t, tz) {                                   // minutes the zone is ahead of UTC on the UTC day of t (read at noon, after any clock change)
+    var day = Math.floor(t / 86400000), key = tz + day;
+    if (_off[key] !== undefined) return _off[key];
+    var f = _fmt[tz] || (_fmt[tz] = new Intl.DateTimeFormat('en-US', { timeZone: tz, hourCycle: 'h23', hour: '2-digit', minute: '2-digit' }));
+    var h = 0, m = 0;
+    f.formatToParts(new Date(day * 86400000 + 43200000)).forEach(function (x) { if (x.type === 'hour') h = +x.value % 24; if (x.type === 'minute') m = +x.value; });
+    return (_off[key] = h * 60 + m - 720);
+  }
+  E.SESSIONS = [{ key: 'ldn', name: 'London', tz: 'Europe/London', h: 8, m: 0 }, { key: 'ny', name: 'New York', tz: 'America/New_York', h: 9, m: 30 }];
+  E.sessionOpen = function (t, s) { return Math.floor(t / 86400000) * 86400000 + (s.h * 60 + s.m - tzOff(t, s.tz)) * 60000; };
+  /* the hours when gold trades most: 11:00 to 17:00 GMT (13:00 to 19:00 in South Africa), Monday to Friday */
+  E.busy = function (t) { var d = new Date(t), h = d.getUTCHours(), w = d.getUTCDay(); return w >= 1 && w <= 5 && h >= 11 && h < 17; };
+
+  /* opening ranges of today: the high and low of the hour before the London and the New York open,
+     and the first 5-minute close outside that range in the two hours after the open */
+  E.ranges = function (c, atr) {
+    var out = [], last = c.length - 2, now = c[c.length - 1].t;
+    E.SESSIONS.forEach(function (s) {
+      var open = E.sessionOpen(now, s), wd = new Date(open).getUTCDay();
+      if (wd === 0 || wd === 6 || now < open) return;
+      var hi = -Infinity, lo = Infinity, cnt = 0, i, brk = null, first = -1;
+      for (i = last; i >= 0 && c[i].t >= open - 3600000; i--) {
+        if (c[i].t >= open) { first = i; continue; }
+        cnt++; if (c[i].h > hi) hi = c[i].h; if (c[i].l < lo) lo = c[i].l;
+      }
+      if (cnt < 9) return;                                    // the hour is not in the data
+      var buf = atr * 0.10, end = open + 7200000;
+      if (first >= 0) for (i = first; i <= last && c[i].t < end; i++) {
+        if (c[i].c > hi + buf) { brk = { dir: 1, i: i, t: c[i].t, body: Math.abs(c[i].c - c[i].o) }; break; }
+        if (c[i].c < lo - buf) { brk = { dir: -1, i: i, t: c[i].t, body: Math.abs(c[i].c - c[i].o) }; break; }
+      }
+      out.push({ key: s.key, name: s.name, open: open, hi: hi, lo: lo, width: hi - lo, brk: brk, active: now < end });
+    });
+    return out;
+  };
+
   /* confidence of a directional setup, as a list of visible parts */
   E.confidence = function (f) {
-    var parts = [f.type === 'sweep' ? { label: 'Base for a sweep and reclaim', pts: 48 } : { label: 'Base for a clean break and retest', pts: 50 }];
+    var parts = [f.type === 'sweep' ? { label: 'Base for a sweep and reclaim', pts: 48 } : f.type === 'orb' ? { label: 'Base for an opening-range breakout', pts: 46 } : { label: 'Base for a clean break and retest', pts: 50 }];
     function add(l, p) { parts.push({ label: l, pts: p }); }
+    if (f.d1 === f.dir) add('Daily trend agrees', 8); else if (f.d1 === -f.dir) add('Against the daily trend', -10);
     if (f.h1 === f.dir) add('H1 trend agrees', 10); else if (f.h1 === -f.dir) add('Against the H1 trend', -14); else add('H1 trend is flat', 0);
     if (f.m15 === f.dir) add('M15 trend agrees', 8); else if (f.m15 === -f.dir) add('M15 trend disagrees', -8);
     if (f.type !== 'sweep') { if (f.bodyAtr >= 1.2) add('Strong break candle', 7); else if (f.bodyAtr < 0.6) add('Weak break candle', -5); }
@@ -680,6 +727,8 @@ var IG = (function () {
     var sw = E.swings(c, 2, R);
     var h1 = E.trend(tf.h1, 50, E.atr(tf.h1 || [], 14) * 0.15);
     var m15 = E.trend(tf.m15, 50, E.atr(tf.m15 || [], 14) * 0.10);
+    var dC = tf.d1 || [], d1 = E.trend(dC, 50, E.atr(dC, 14) * 0.10), dDir = d1.ok ? d1.dir : null;
+    var pd = dC.length >= 2 ? dC[dC.length - 2] : null, ors = E.ranges(c, atr);
     var rng = E.range(c, atr);
     var ev = E.breaks(c, sw, atr * 0.10, R);
     var brk = ev.length ? ev[ev.length - 1] : null;
@@ -695,7 +744,8 @@ var IG = (function () {
 
     out = { ok: true, price: px, atr: atr, h1: h1.dir, m15: m15.dir, range: rng, lastBreak: brk, patterns: pats,
             swingHi: lastHi, swingLo: lastLo, structure: structure, setup: null, verdict: 'WAIT', reason: 'none', why: '',
-            sweep: swp, orderBlock: ob, fvgs: gaps.slice(-3) };
+            sweep: swp, orderBlock: ob, fvgs: gaps.slice(-3),
+            d1: dDir, pdh: pd ? pd.h : null, pdl: pd ? pd.l : null, ranges: ors, busy: E.busy(c[c.length - 1].t) };
 
     var fresh = brk && (last - brk.i) <= 6;
     var newsLock = ctx && ctx.newsMin !== null && ctx.newsMin !== undefined && ctx.newsMin <= 15;
@@ -703,7 +753,23 @@ var IG = (function () {
     var inRange = !!(rng && px <= rng.hi && px >= rng.lo);
     /* a break that was immediately reclaimed is a trap, not a break */
     var trapped = fresh && swp && swp.flip && swp.dir === -brk.dir && swp.i >= brk.i;
-    if (fresh && !trapped && !inRange) {
+
+    /* opening-range breakout: the first 5-minute close outside the hour before the London or New York open.
+       Entry is at the market on the break, stop at the middle of the range, one call per session. */
+    for (i = 0; i < ors.length && !setup; i++) {
+      var o = ors[i];
+      if (!o.active || !o.brk || last - o.brk.i > 1 || o.width < atr * 1.2 || o.width > atr * 7) continue;
+      var od = o.brk.dir, edge = od === 1 ? o.hi : o.lo, mid = (o.hi + o.lo) / 2, os = mid, odist = (px - mid) * od;
+      if (odist < atr * 0.6) { odist = atr * 0.6; os = px - od * odist; }
+      if (odist > atr * 3.2 || (px - edge) * od > atr * 1.5 || (px - edge) * od < 0) continue;      // too wide, already ran, or back inside
+      conf = E.confidence({ type: 'orb', dir: od, d1: dDir, h1: h1.dir, m15: m15.dir, bodyAtr: o.brk.body / atr, choch: false, pattern: patDir,
+                            swept: false, ob: false, fvg: false, peers: peersOf(od), newsMin: ctx ? ctx.newsMin : null, rr: 1 });
+      setup = { dir: od, type: 'orb', level: edge, entry: px, sl: os, tp1: px + od * odist, tp2: px + od * odist * 2, dist: odist,
+                conf: conf.pct, parts: conf.parts, grade: E.grade(conf.pct), against: h1.dir === -od, choch: false,
+                bodyAtr: o.brk.body / atr, atZone: true, breakT: o.open, mkt: true, sess: o.name, rngHi: o.hi, rngLo: o.lo };
+    }
+
+    if (!setup && fresh && !trapped && !inRange) {
       var dir = brk.dir, ext = brk.ext;
       for (i = brk.i; i <= last; i++) ext = (dir === 1) ? Math.min(ext, c[i].l) : Math.max(ext, c[i].h);
       var entry = brk.level + dir * atr * 0.05;
@@ -715,7 +781,7 @@ var IG = (function () {
       var ran = (dir === 1) ? (px - entry) > dist * 2.2 : (entry - px) > dist * 2.2;
       if (dist <= atr * 3.2 && !failed && !ran && !(against && !brk.choch)) {
         var tp1 = entry + dir * dist, tp2 = entry + dir * dist * 2;
-        conf = E.confidence({ type: 'retest', dir: dir, h1: h1.dir, m15: m15.dir, bodyAtr: brk.body / atr, choch: brk.choch, pattern: patDir,
+        conf = E.confidence({ type: 'retest', dir: dir, d1: dDir, h1: h1.dir, m15: m15.dir, bodyAtr: brk.body / atr, choch: brk.choch, pattern: patDir,
                               swept: !!(swp && swp.dir === dir && swp.i < brk.i && brk.i - swp.i <= 8),
                               ob: backs(ob, dir, entry, sl), fvg: gapBacks(dir, entry, sl),
                               peers: peersOf(dir), newsMin: ctx ? ctx.newsMin : null, rr: 1 });
@@ -739,7 +805,7 @@ var IG = (function () {
           var m = (far[q2].p - e2) * d2 / ds;
           if (m >= 1.5 && m <= 3.5) { t2 = far[q2].p - d2 * atr * 0.05; break; }
         }
-        conf = E.confidence({ type: 'sweep', dir: d2, h1: h1.dir, m15: m15.dir, bodyAtr: 0, choch: false, pattern: patDir,
+        conf = E.confidence({ type: 'sweep', dir: d2, d1: dDir, h1: h1.dir, m15: m15.dir, bodyAtr: 0, choch: false, pattern: patDir,
                               swept: false, ob: false, fvg: gapBacks(d2, e2, s2), peers: peersOf(d2), newsMin: ctx ? ctx.newsMin : null, rr: 1 });
         setup = { dir: d2, type: 'sweep', level: swp.level, entry: e2, sl: s2, tp1: t1, tp2: t2, dist: ds,
                   conf: conf.pct, parts: conf.parts, grade: E.grade(conf.pct), against: h1.dir === -d2, choch: false,
@@ -747,6 +813,7 @@ var IG = (function () {
       }
     }
 
+    if (setup) setup.d1 = dDir === null ? null : dDir === setup.dir ? 1 : dDir === -setup.dir ? -1 : 0;   // 1 with the daily trend, -1 against, 0 flat
     if (setup && newsLock) { out.verdict = 'WAIT'; out.reason = 'news'; out.pendingSetup = setup; }
     else if (setup && setup.conf >= 45) { out.verdict = setup.dir === 1 ? 'BUY' : 'SELL'; out.reason = 'setup'; out.setup = setup; }
     else if (setup) { out.verdict = 'WAIT'; out.reason = 'lowconf'; out.pendingSetup = setup; }
@@ -790,9 +857,11 @@ var IG = (function () {
 
   /* a tracked call made from a setup */
   E.makeCall = function (sym, s, now, demo) {
-    return { key: sym + '|' + s.type + '|' + s.breakT + '|' + s.dir, sym: sym, t: now, dir: s.dir, type: s.type, entry: s.entry, sl: s.sl, tp1: s.tp1, tp2: s.tp2,
+    var k = { key: sym + '|' + s.type + '|' + s.breakT + '|' + s.dir, sym: sym, t: now, dir: s.dir, type: s.type, entry: s.entry, sl: s.sl, tp1: s.tp1, tp2: s.tp2,
              dist: s.dist, level: s.level, conf: s.conf, grade: s.grade, parts: s.parts, breakT: s.breakT, bodyAtr: s.bodyAtr, choch: s.choch,
-             against: s.against, stage: 'setup', expiryMin: 45, demo: !!demo };
+             against: s.against, stage: 'setup', expiryMin: 45, demo: !!demo, d1: s.d1 === undefined ? null : s.d1, busy: E.busy(now) };
+    if (s.mkt) { k.mkt = true; k.stage = 'live'; k.tEntry = now; k.fillBar = null; k.sess = s.sess; k.rngHi = s.rngHi; k.rngLo = s.rngLo; }   // entered at the market, so it is live at once
+    return k;
   };
 
   /* result of a finished call in units of risk (R), banking half at TP1 and moving the stop to entry */
@@ -805,47 +874,62 @@ var IG = (function () {
 
   /* Replay the rules over history, candle by candle, with no look-ahead: the read is taken at the
      open of each 5-minute candle from closed candles only, then the candle's high and low move the call.
-     tf: {m5, m15, h1} full history. opts: {sym, isOpen(t), warm} */
-  E.backtest = function (tf, opts) {
+     tf: {m5, m15, h1, d1} full history. opts: {sym, isOpen(t), warm}
+     btStart / btStep / btEnd run it in slices so a long test does not freeze the page. */
+  E.btStart = function (tf, opts) {
     opts = opts || {};
-    var m5 = tf.m5, m15 = tf.m15 || [], h1 = tf.h1 || [], calls = [], act = null, keys = {}, p15 = 0, p60 = 0;
-    var warm = opts.warm || 120, n = m5.length - 1;                     // the last candle is still forming
+    var warm = opts.warm || 120, n = tf.m5.length - 1;                  // the last candle is still forming
     if (n <= warm + 20) return null;
+    return { tf: tf, opts: opts, warm: warm, n: n, i: warm, calls: [], act: null, keys: {}, p15: 0, p60: 0, pD: 0 };
+  };
+  E.btStep = function (S, ms) {
+    var m5 = S.tf.m5, m15 = S.tf.m15 || [], h1 = S.tf.h1 || [], d1 = S.tf.d1 || [], opts = S.opts, t0 = Date.now();
     function flat(t, p) { return { t: t, o: p, h: p, l: p, c: p }; }
-    for (var i = warm; i < n; i++) {
-      var x = m5[i];
-      while (p15 < m15.length && m15[p15].t + 900000 <= x.t) p15++;
-      while (p60 < h1.length && h1[p60].t + 3600000 <= x.t) p60++;
+    for (; S.i < S.n; S.i++) {
+      if (ms && (S.i & 31) === 0 && Date.now() - t0 > ms) return false;
+      var i = S.i, x = m5[i];
+      while (S.p15 < m15.length && m15[S.p15].t + 900000 <= x.t) S.p15++;
+      while (S.p60 < h1.length && h1[S.p60].t + 3600000 <= x.t) S.p60++;
+      while (S.pD < d1.length && d1[S.pD].t + 86400000 <= x.t) S.pD++;
       var s5 = m5.slice(Math.max(0, i - 300), i); s5.push(flat(x.t, x.o));
-      var s15 = m15.slice(Math.max(0, p15 - 200), p15); s15.push(flat(x.t, x.o));
-      var s60 = h1.slice(Math.max(0, p60 - 200), p60); s60.push(flat(x.t, x.o));
-      var an = E.analyse({ m5: s5, m15: s15, h1: s60 }, { newsMin: null, peersDir: 0 });
+      var s15 = m15.slice(Math.max(0, S.p15 - 200), S.p15); s15.push(flat(x.t, x.o));
+      var s60 = h1.slice(Math.max(0, S.p60 - 200), S.p60); s60.push(flat(x.t, x.o));
+      var sD = d1.slice(Math.max(0, S.pD - 120), S.pD); if (sD.length) sD.push(flat(x.t, x.o));
+      var an = E.analyse({ m5: s5, m15: s15, h1: s60, d1: sD }, { newsMin: null, peersDir: 0 }), act = S.act;
       if (an.ok) {
         if (act && act.stage === 'setup' && an.lastBreak && an.lastBreak.dir === -act.dir && an.lastBreak.t > act.breakT) { act.stage = 'cancelled'; act.tEnd = x.t; act = null; }
         if (!act && an.setup && (!opts.isOpen || opts.isOpen(x.t))) {
           var k = E.makeCall(opts.sym || 'X', an.setup, x.t, false);
-          if (!keys[k.key]) { keys[k.key] = 1; calls.push(k); act = k; }
+          if (!S.keys[k.key]) { S.keys[k.key] = 1; S.calls.push(k); act = k; }
         }
       }
       if (act) {
         E.stepCall(act, x.h, x.l, x.t + 299999, x.t);
         if (act.stage === 'stopped' || act.stage === 'done' || act.stage === 'expired') act = null;
       }
+      S.act = act;
     }
-    var st = E.stats(calls), net = 0, peak = 0, dd = 0, byType = {}, byGrade = {};
+    return true;
+  };
+  E.btEnd = function (S) {
+    var m5 = S.tf.m5, calls = S.calls, st = E.stats(calls), net = 0, peak = 0, dd = 0, byType = {}, byGrade = {}, byD1 = {}, byHours = {};
     var gw = 0, gl = 0, nw = 0, nl = 0, run = 0, maxRun = 0;
+    function put(map, key, k, r) { var b = map[key] || (map[key] = { n: 0, win: 0, r: 0 }); b.n++; if (k.result !== 'loss') b.win++; b.r = Math.round((b.r + r) * 100) / 100; }
     calls.forEach(function (k) {
       if (!(k.stage === 'stopped' || k.stage === 'done' || k.stage === 'tp1')) return;
       var r = E.callR(k); net += r; if (net > peak) peak = net; if (peak - net > dd) dd = peak - net;
       if (r > 0) { gw += r; nw++; run = 0; } else if (r < 0) { gl -= r; nl++; run++; if (run > maxRun) maxRun = run; }
-      var b = byType[k.type] || (byType[k.type] = { n: 0, win: 0 }); b.n++; if (k.result !== 'loss') b.win++;
-      var gq = byGrade[k.grade] || (byGrade[k.grade] = { n: 0, win: 0 }); gq.n++; if (k.result !== 'loss') gq.win++;
+      put(byType, k.type, k, r); put(byGrade, k.grade, k, r);
+      if (k.d1 !== null && k.d1 !== undefined) put(byD1, k.d1 === 1 ? 'with' : k.d1 === -1 ? 'against' : 'flat', k, r);
+      put(byHours, k.busy ? 'busy' : 'other', k, r);
     });
     return { calls: calls, n: st.n, win: st.win, pct: st.pct, skipped: st.skipped, netR: Math.round(net * 10) / 10, ddR: Math.round(dd * 10) / 10,
              pf: gl > 0 ? Math.round(gw / gl * 100) / 100 : null, expR: st.n ? Math.round(net / st.n * 100) / 100 : null,
              avgWinR: nw ? Math.round(gw / nw * 100) / 100 : null, avgLossR: nl ? Math.round(gl / nl * 100) / 100 : null, lossRun: maxRun,
-             byType: byType, byGrade: byGrade, from: m5[warm].t, to: m5[n].t, hours: Math.round((m5[n].t - m5[warm].t) / 3600000) };
+             byType: byType, byGrade: byGrade, byD1: byD1, byHours: byHours,
+             from: m5[S.warm].t, to: m5[S.n].t, hours: Math.round((m5[S.n].t - m5[S.warm].t) / 3600000) };
   };
+  E.backtest = function (tf, opts) { var S = E.btStart(tf, opts); if (!S) return null; E.btStep(S); return E.btEnd(S); };
 
   /* statistics of finished calls */
   E.stats = function (calls, sinceMs) {
@@ -892,7 +976,8 @@ if (typeof module !== 'undefined') module.exports = IG;
   var S = {}, SPOT = {}, HIST = {}, NEWS = [], newsOK = false, CALLS = LS.get('ig_calls', []);
   var active = SYMS[CFG.sym] ? CFG.sym : 'GOLD', booted = false, lastSpoken = '', lastKey = '';
   var T0 = Date.now();
-  Object.keys(SYMS).forEach(function (k) { S[k] = { raw: null, tf: null, an: null, demo: false, off: 0, mode: '', tK: 0, tStep: 0, loading: false, bt: null, tBT: 0, full: null }; });
+  Object.keys(SYMS).forEach(function (k) { S[k] = { raw: null, tf: null, an: null, demo: false, off: 0, mode: '', tK: 0, tStep: 0, loading: false, bt: null, tBT: 0, full: null, btL: LS.get('ig_btl_' + k, null), btRun: null, btErr: '' }; });
+  var TYPES = { retest: 'break and retest', sweep: 'sweep and reclaim', orb: 'opening-range breakout' }, LONG_DAYS = 180;
 
   /* ---------- helpers ---------- */
   function fmt(v, dp) { if (v === null || v === undefined || isNaN(v)) return '--'; return Number(v).toLocaleString('en-US', { minimumFractionDigits: dp, maximumFractionDigits: dp }); }
@@ -959,6 +1044,18 @@ if (typeof module !== 'undefined') module.exports = IG;
       return a.map(function (k) { return { t: k[0], o: +k[1], h: +k[2], l: +k[3], c: +k[4] }; });
     });
   }
+  function dailyOf(id, a) { return id === 'BTC' ? a : a.filter(function (x) { var w = new Date(x.t).getUTCDay(); return w >= 1 && w <= 5; }); }
+  function binDaily(id, lim) { return binKlines(SYMS[id].bin, '1d', lim).then(function (a) { return dailyOf(id, a); }).catch(function () { return []; }); }
+  function binHist(sym, iv, count, tick) {                  // pages back from now; returns candles oldest first
+    var all = [];
+    function page(end) {
+      return binKlines(sym, iv, 1000, end).then(function (a) {
+        all = a.concat(all); if (tick) tick();
+        return (all.length >= count || a.length < 1000) ? all : page(a[0].t - 1);
+      }).catch(function (e) { if (all.length > 2000) return all; throw e; });
+    }
+    return page(0);
+  }
   function aggregate(c, mins) {
     var out = [], step = mins * 60000, cur = null;
     c.forEach(function (x) {
@@ -1007,7 +1104,7 @@ if (typeof module !== 'undefined') module.exports = IG;
     if (st.loading) return Promise.resolve();
     st.loading = true;
     var job = sym.bin
-      ? Promise.all([binKlines(sym.bin, '5m', 300), binKlines(sym.bin, '15m', 200), binKlines(sym.bin, '1h', 200)]).then(function (a) { return { m5: a[0], m15: a[1], h1: a[2] }; })
+      ? Promise.all([binKlines(sym.bin, '5m', 300), binKlines(sym.bin, '15m', 200), binKlines(sym.bin, '1h', 200), binDaily(id, 160)]).then(function (a) { return { m5: a[0], m15: a[1], h1: a[2], d1: a[3] }; })
       : yahooM5(sym.yahoo).then(function (m5) { st.full = { m5: m5, m15: aggregate(m5, 15), h1: aggregate(m5, 60) }; return { m5: m5.slice(-320), m15: st.full.m15, h1: st.full.h1 }; });
     return job.then(function (tf) { if (!st.raw || st.demo) logEv(sym.label + ' candles live', 'up'); st.raw = tf; st.demo = false; st.tK = Date.now(); st.ci = closeInfo(id, tf.h1); })
       .catch(function () { if (!st.raw) { st.raw = demoTF(sym); st.demo = true; st.tK = Date.now(); logEv(sym.label + ' feed not reachable, showing demo data', 'warn'); } })
@@ -1018,8 +1115,8 @@ if (typeof module !== 'undefined') module.exports = IG;
     var sym = SYMS[id], st = S[id]; st.tBT = Date.now();
     var job = sym.bin
       ? binKlines(sym.bin, '5m', 1000).then(function (a) {
-          return Promise.all([binKlines(sym.bin, '5m', 1000, a[0].t - 1), binKlines(sym.bin, '15m', 1000), binKlines(sym.bin, '1h', 500)])
-            .then(function (r) { return { m5: r[0].concat(a), m15: r[1], h1: r[2] }; });
+          return Promise.all([binKlines(sym.bin, '5m', 1000, a[0].t - 1), binKlines(sym.bin, '15m', 1000), binKlines(sym.bin, '1h', 500), binDaily(id, 200)])
+            .then(function (r) { return { m5: r[0].concat(a), m15: r[1], h1: r[2], d1: r[3] }; });
         })
       : Promise.resolve(st.full);
     job.then(function (tf) {
@@ -1028,6 +1125,32 @@ if (typeof module !== 'undefined') module.exports = IG;
       if (st.bt && st.bt.n) logEv(SYMS[id].label + ' backtest done: ' + st.bt.win + ' of ' + st.bt.n + ' calls hit TP1 (' + st.bt.pct + '%)');
       if (id === active) render();
     }).catch(function () { st.tBT = Date.now() - 3300000; });          // try again in five minutes
+  }
+  /* the long test: six months of 5-minute candles, run in slices so the page stays usable */
+  function runLong(id) {
+    var sym = SYMS[id], st = S[id]; if (!sym.bin || st.btRun || st.demo) return;
+    var n5 = LONG_DAYS * 288 + 400, total = Math.ceil(n5 / 1000) + Math.ceil((n5 / 3 + 250) / 1000) + Math.ceil((n5 / 12 + 250) / 1000), done = 0;
+    function show(t) { st.btRun = { txt: t }; if (id === active) renderBT(id); }
+    function tick() { done++; show('Loading ' + LONG_DAYS + ' days of candles: ' + Math.min(99, Math.round(100 * done / total)) + '%'); }
+    st.btErr = ''; show('Loading ' + LONG_DAYS + ' days of candles: 0%');
+    Promise.all([binHist(sym.bin, '5m', n5, tick), binHist(sym.bin, '15m', Math.ceil(n5 / 3) + 250, tick), binHist(sym.bin, '1h', Math.ceil(n5 / 12) + 250, tick), binDaily(id, Math.min(1000, LONG_DAYS + 140))])
+      .then(function (r) {
+        var run = IG.btStart({ m5: r[0], m15: r[1], h1: r[2], d1: r[3] }, { sym: id, warm: 400, isOpen: function (t) { return openAt(id, t); } });
+        if (!run) throw new Error('short');
+        return new Promise(function (res) {
+          (function slice() {
+            var fin = IG.btStep(run, 40);
+            show('Testing the rules: ' + Math.round(100 * (run.i - run.warm) / (run.n - run.warm)) + '%');
+            if (fin) res(IG.btEnd(run)); else setTimeout(slice, 0);
+          })();
+        });
+      })
+      .then(function (bt) {
+        bt.t = Date.now(); delete bt.calls; st.btL = bt; LS.set('ig_btl_' + id, bt); st.btRun = null;
+        logEv(sym.label + ' ' + Math.round(bt.hours / 24) + '-day test done: ' + bt.win + ' of ' + bt.n + ' calls hit TP1 (' + bt.pct + '%), ' + (bt.netR >= 0 ? '+' : '') + bt.netR.toFixed(1) + 'R', bt.netR >= 0 ? 'up' : 'down');
+        if (id === active) render();
+      })
+      .catch(function () { st.btRun = null; st.btErr = 'The long test could not load the history. Check the connection and try again.'; if (id === active) renderBT(id); });
   }
   function pollSpot(code) {
     return direct('https://api.gold-api.com/price/' + code).then(function (j) {
@@ -1062,7 +1185,7 @@ if (typeof module !== 'undefined') module.exports = IG;
     }
     off = st.off;
     function sh(c) { return c.map(function (x) { return { t: x.t, o: x.o + off, h: x.h + off, l: x.l + off, c: x.c + off }; }); }
-    var out = { m5: sh(raw.m5), m15: sh(raw.m15), h1: sh(raw.h1) };
+    var out = { m5: sh(raw.m5), m15: sh(raw.m15), h1: sh(raw.h1), d1: sh(raw.d1 || []) };
     if (st.mode === 'spot' && live && marketOpen(id)) { var f = out.m5[out.m5.length - 1]; f.c = sp.p; if (sp.p > f.h) f.h = sp.p; if (sp.p < f.l) f.l = sp.p; }   // the candle still forming ends at the live price
     return out;
   }
@@ -1202,7 +1325,7 @@ if (typeof module !== 'undefined') module.exports = IG;
     if (ac && ac.stage === 'setup' && an.lastBreak && an.lastBreak.dir === -ac.dir && an.lastBreak.t > ac.breakT) { ac.stage = 'cancelled'; ac.tEnd = Date.now(); saveCalls(); ac = null; }
     if (!ac && an.setup && marketOpen(id) && st.mode) {
       var k = IG.makeCall(id, an.setup, Date.now(), st.demo);
-      if (!CALLS.some(function (c) { return c.key === k.key; })) { CALLS.push(k); saveCalls(); if (!k.demo) logEv(SYMS[id].label + ' ' + (k.dir === 1 ? 'BUY' : 'SELL') + ' setup, ' + (k.type === 'sweep' ? 'sweep and reclaim' : 'break and retest') + ', entry ' + P(id, k.entry) + ', confidence ' + k.conf + '%', k.dir === 1 ? 'up' : 'down'); if (id !== active && booted && !k.demo) alertUser(id, verdict(id)); }
+      if (!CALLS.some(function (c) { return c.key === k.key; })) { CALLS.push(k); saveCalls(); if (!k.demo) logEv(SYMS[id].label + ' ' + (k.dir === 1 ? 'BUY' : 'SELL') + ' setup, ' + (TYPES[k.type] || k.type) + ', entry ' + P(id, k.entry) + ', confidence ' + k.conf + '%', k.dir === 1 ? 'up' : 'down'); if (id !== active && booted && !k.demo) alertUser(id, verdict(id)); }
     }
   }
 
@@ -1223,19 +1346,23 @@ if (typeof module !== 'undefined') module.exports = IG;
   function who() { return CFG.name || 'Zeus'; }
   function tn(d) { return d === 1 ? 'up' : d === -1 ? 'down' : 'flat'; }
   function trendTxt(an) {
-    if (an.h1 === an.m15 && an.h1 !== 0) return 'The H1 and M15 trends are both ' + tn(an.h1) + '.';
-    return 'The H1 trend is ' + tn(an.h1) + ' and the M15 trend is ' + tn(an.m15) + ', so they do not agree.';
+    var d = an.d1 === 1 || an.d1 === -1 ? ' The daily trend is ' + tn(an.d1) + '.' : an.d1 === 0 ? ' The daily trend is flat.' : '';
+    if (an.h1 === an.m15 && an.h1 !== 0) return 'The H1 and M15 trends are both ' + tn(an.h1) + '.' + d;
+    return 'The H1 trend is ' + tn(an.h1) + ' and the M15 trend is ' + tn(an.m15) + ', so they do not agree.' + d;
   }
   function whyCall(id, c, an) {
-    var b = c.dir === 1;
+    var b = c.dir === 1, dn = c.d1 === -1 ? ' It is against the daily trend, which is the weaker side.' : c.d1 === 1 ? ' It is with the daily trend.' : '';
+    if (c.type === 'orb') return 'A 5-minute candle closed ' + (b ? 'above' : 'below') + ' the ' + c.sess + ' opening range, ' + P(id, c.rngLo) + ' to ' + P(id, c.rngHi) + ', which is the hour before the ' + c.sess + ' open. ' +
+      'The first break of that range often sets the direction for the session. The entry is at the market on the break and the stop is at the middle of the range, so a move back inside proves the idea wrong. ' +
+      (an ? trendTxt(an) : '') + dn + ' This setup is new here and not yet proven on ' + SYMS[id].word + ': check its line in the backtest.';
     if (c.type === 'sweep') return 'Price poked ' + (b ? 'below the swing low ' : 'above the swing high ') + P(id, c.level) + ' ' + ago(c.breakT) + ', took the stops resting there and closed back ' + (b ? 'above' : 'below') + ' it. ' +
       'That is a fake move: the ' + (b ? 'sellers' : 'buyers') + ' who followed it are trapped. The entry is the retest of the reclaimed level. ' +
-      'The stop sits just beyond the poke, so if price gets back there the idea is wrong. ' + (an ? trendTxt(an) : '') + (c.against ? ' This trade is against the H1 trend, so it is weaker.' : '');
+      'The stop sits just beyond the poke, so if price gets back there the idea is wrong. ' + (an ? trendTxt(an) : '') + (c.against ? ' This trade is against the H1 trend, so it is weaker.' : '') + dn;
     return 'A 5-minute candle closed ' + (b ? 'above the swing high ' : 'below the swing low ') + P(id, c.level) + ' ' + ago(c.breakT) +
       (c.bodyAtr >= 1.2 ? ' with a strong candle' : c.bodyAtr < 0.6 ? ' with a weak candle' : '') + (c.choch ? ', which changes the character of the structure' : '') + '. ' +
       'The entry is the retest of that level: ' + (b ? 'old resistance should now hold as support' : 'old support should now act as resistance') + '. ' +
       'The stop sits ' + (b ? 'under the low' : 'over the high') + ' of the move, so if price gets there the idea is wrong. ' + (an ? trendTxt(an) : '') +
-      (c.against ? ' This trade is against the H1 trend, so it is weaker.' : '');
+      (c.against ? ' This trade is against the H1 trend, so it is weaker.' : '') + dn;
   }
   /* the verdict for a market: headline, action, reason, numbers */
   function verdict(id) {
@@ -1271,6 +1398,10 @@ if (typeof module !== 'undefined') module.exports = IG;
         v.act = near ? 'Price is at the entry now. ' + (b ? 'Buy ' : 'Sell ') + P(id, ac.entry) + ', stop ' + P(id, ac.sl) + '.'
                      : 'Wait for price to come back to ' + P(id, ac.entry) + ', then ' + (b ? 'buy' : 'sell') + '. Do not chase it. Stop ' + P(id, ac.sl) + '.';
         v.speak = N + ', ' + ac.grade.toLowerCase() + ' ' + D.toLowerCase() + ' setup on ' + sym.word + '. Entry ' + P(id, ac.entry) + '. Stop ' + P(id, ac.sl) + '. First target ' + P(id, ac.tp1) + '. Confidence ' + ac.conf + ' percent.';
+      } else if (ac.stage === 'live' && ac.mkt && Date.now() - ac.tEntry < 300000) {
+        v.head = ac.grade + ' ' + D + ': ' + ac.sess.toUpperCase() + ' RANGE BREAK';
+        v.act = (b ? 'Buy' : 'Sell') + ' at the market near ' + P(id, ac.entry) + ', stop ' + P(id, ac.sl) + '. If price is already more than ' + fmt(ac.dist * 0.5, sym.dp) + ' past that, skip it.';
+        v.speak = N + ', ' + ac.grade.toLowerCase() + ' ' + D.toLowerCase() + ' on ' + sym.word + '. ' + ac.sess + ' opening range break. Entry near ' + P(id, ac.entry) + '. Stop ' + P(id, ac.sl) + '. First target ' + P(id, ac.tp1) + '. Confidence ' + ac.conf + ' percent.';
       } else if (ac.stage === 'live') {
         v.head = 'IN THE TRADE: ' + D;
         v.act = 'Entry was reached ' + ago(ac.tEntry) + '. Hold. Take profit 1 is ' + P(id, ac.tp1) + '. Stop ' + P(id, ac.sl) + '.';
@@ -1331,9 +1462,9 @@ if (typeof module !== 'undefined') module.exports = IG;
     var stAll = IG.stats(CALLS.filter(function (c) { return c.sym === id && !c.demo; }));
     setTxt('rCf', v.conf !== null ? 'CONFIDENCE ' + v.conf + '%' : (an && an.ok ? 'NO ACTIVE SETUP' : 'STARTING'));
     setTxt('kConf', v.conf !== null ? v.conf + '%' : '--');
-    var gr = v.conf !== null ? IG.grade(v.conf) : '', gb = gr && st.bt && st.bt.byGrade[gr] ? st.bt.byGrade[gr] : null;
+    var gr = v.conf !== null ? IG.grade(v.conf) : '', gb = gr && (st.btL || st.bt) && (st.btL || st.bt).byGrade[gr] ? (st.btL || st.bt).byGrade[gr] : null;
     setTxt('kConfN', v.conf !== null ? gr + (gb ? ': ' + gb.win + ' of ' + gb.n + ' in backtest' : ' score') : 'no setup');
-    var bt = st.bt; var useBT = stAll.n < 10 && bt && bt.n > 0;
+    var bt = st.btL || st.bt; var useBT = stAll.n < 10 && bt && bt.n > 0;
     setTxt('kSucc', useBT ? bt.pct + '%' : stAll.pct !== null ? stAll.pct + '%' : '--');
     setTxt('kSuccN', useBT ? 'backtest, ' + bt.n + ' calls' : stAll.n ? stAll.win + ' of ' + stAll.n + ' live calls' : 'no calls scored yet');
     setTxt('kStruct', an && an.ok ? (an.range ? 'RANGE' : an.structure) : '--');
@@ -1376,6 +1507,8 @@ if (typeof module !== 'undefined') module.exports = IG;
     var agree = an.h1 !== 0 && an.h1 === an.m15;
     setTxt('trendTag', agree ? 'AGREE' : 'MIXED');
     $('trendRows').innerHTML =
+      '<div class="row"><span>Daily trend (50 EMA)</span><b class="' + (an.d1 === null ? 'dim' : cls(an.d1)) + '">' + (an.d1 === null ? 'NO DATA' : tn(an.d1).toUpperCase()) + '</b></div>' +
+      (active !== 'BTC' ? '<div class="row"><span>Busy hours (13:00 to 19:00)</span><b class="' + (an.busy ? 'up' : 'dim') + '">' + (an.busy ? 'YES, NOW' : 'NO') + '</b></div>' : '') +
       '<div class="row"><span>H1 trend (50 EMA)</span><b class="' + cls(an.h1) + '">' + tn(an.h1).toUpperCase() + '</b></div>' +
       '<div class="row"><span>M15 trend (50 EMA)</span><b class="' + cls(an.m15) + '">' + tn(an.m15).toUpperCase() + '</b></div>' +
       '<div class="row"><span>M5 structure</span><b class="' + (an.structure === 'BULLISH' ? 'up' : an.structure === 'BEARISH' ? 'down' : 'dim') + '">' + (an.range ? 'RANGE' : an.structure) + '</b></div>' +
@@ -1390,6 +1523,10 @@ if (typeof module !== 'undefined') module.exports = IG;
       rows.push(['FRIDAY HIGH (BUY ABOVE)', P(id, pl.buyAbove), 'up']); rows.push(['FRIDAY LOW (SELL BELOW)', P(id, pl.sellBelow), 'down']);
       rows.push(['WEEK HIGH', P(id, pl.wHi), '']); rows.push(['WEEK LOW', P(id, pl.wLo), '']);
     }
+    if (an.pdh !== null && !pl) { rows.push(['PREVIOUS DAY HIGH', P(id, an.pdh), '']); rows.push(['PREVIOUS DAY LOW', P(id, an.pdl), '']); }
+    (an.ranges || []).forEach(function (o) {
+      rows.push([o.name.toUpperCase() + ' OPENING RANGE', P(id, o.lo) + ' to ' + P(id, o.hi) + ', ' + (o.brk ? 'BROKE ' + (o.brk.dir === 1 ? 'UP ' : 'DOWN ') + hm(new Date(o.brk.t + 300000), 'Africa/Johannesburg') : o.active ? 'NOT BROKEN YET' : 'NO BREAK IN 2 HOURS'), o.brk ? (o.brk.dir === 1 ? 'up' : 'down') : 'dim']);
+    });
     $('structBox').innerHTML = r ? '<div class="rows"><div class="row"><span>RANGE HIGH</span><b>' + P(id, r.hi) + '</b></div><div class="rangebox"></div><div class="row"><span>RANGE LOW</span><b>' + P(id, r.lo) + '</b></div></div>' : '';
     rows.push(['CONSOLIDATION', r ? 'DETECTED, ' + dur(r.bars * 5) : 'NO', r ? 'warn' : 'dim']);
     var names = { hs: 'HEAD AND SHOULDERS', ihs: 'INVERSE HEAD AND SHOULDERS', dt: 'DOUBLE TOP', db: 'DOUBLE BOTTOM' };
@@ -1450,19 +1587,51 @@ if (typeof module !== 'undefined') module.exports = IG;
     });
     $('logBody').innerHTML = rows.length ? rows.join('') : '<tr><td colspan="6">No calls yet.</td></tr>';
   }
+  function btRead(bt) {                                      // what the splits say, in plain words, only when there are enough calls
+    var out = [], MIN = 20;
+    function per(x) { return x && x.n ? x.r / x.n : 0; }
+    function sg(v) { return (v >= 0 ? '+' : '') + v.toFixed(2) + 'R'; }
+    var w = bt.byD1.with, a = bt.byD1.against, bu = bt.byHours.busy, ot = bt.byHours.other, ob = bt.byType.orb;
+    if (w && a && w.n >= MIN && a.n >= MIN) {
+      var dd = per(w) - per(a);
+      out.push(dd > 0.10 ? 'Calls with the daily trend did better (' + sg(per(w)) + ' per call against ' + sg(per(a)) + '), so the daily gate helped here.'
+        : dd < -0.10 ? 'Calls against the daily trend did better here (' + sg(per(a)) + ' per call against ' + sg(per(w)) + '), so the daily gate is not proven on this period.'
+        : 'Trading with or against the daily trend made little difference here.');
+    } else out.push('Too few calls to judge the daily trend.');
+    if (bu && ot && bu.n >= MIN && ot.n >= MIN) {
+      var dh = per(bu) - per(ot);
+      out.push(dh > 0.10 ? 'Busy hours did better than the rest of the day.' : dh < -0.10 ? 'Busy hours did worse than the rest of the day.' : 'Busy hours and other hours were about the same.');
+    }
+    if (ob && ob.n >= MIN) out.push('The opening-range breakout ' + (per(ob) > 0.05 ? 'made money' : per(ob) < -0.05 ? 'lost money' : 'broke even') + ' (' + sg(per(ob)) + ' per call).');
+    else out.push('Too few opening-range breakouts to judge that setup.');
+    return out.join(' ');
+  }
   function renderBT(id) {
-    var st = S[id], bt = st.bt, box = $('btBox'), sym = SYMS[id];
+    var st = S[id], bt = st.btL || st.bt, box = $('btBox'), sym = SYMS[id], btn = $('btLong'), stat = $('btStat');
+    btn.hidden = !sym.bin || st.demo; btn.disabled = !!st.btRun;
+    btn.textContent = st.btL ? 'RUN THE ' + LONG_DAYS + '-DAY TEST AGAIN' : 'TEST ' + LONG_DAYS + ' DAYS';
+    stat.textContent = st.btRun ? st.btRun.txt : st.btErr ? st.btErr : st.btL ? 'Long test run ' + ago(st.btL.t) + '.' : sym.bin && !st.demo ? 'Takes about a minute.' : !sym.bin ? 'The long test needs history that is not free for ' + sym.word + '.' : '';
     if (st.demo) { box.textContent = 'No backtest on demo data.'; return; }
     if (!bt) { box.textContent = 'Replaying the rules over the last week of ' + sym.word + ' candles.'; return; }
-    if (!bt.n) { box.textContent = 'The rules found no completed calls in the last ' + Math.round(bt.hours / 24) + ' days of ' + sym.word + ' candles.'; return; }
-    var parts = [], names = { retest: 'break and retest', sweep: 'sweep and reclaim' };
-    Object.keys(bt.byType).forEach(function (k) { parts.push((names[k] || k) + ' ' + bt.byType[k].win + ' of ' + bt.byType[k].n); });
-    box.innerHTML = '<b>' + sym.label + ', last ' + Math.round(bt.hours / 24) + ' days:</b> ' + bt.n + ' calls reached the entry, ' + bt.win + ' hit TP1 first (<b>' + bt.pct + '%</b>). ' +
+    var days = Math.round(bt.hours / 24);
+    if (!bt.n) { box.textContent = 'The rules found no completed calls in the last ' + days + ' days of ' + sym.word + ' candles.'; return; }
+    function line(label, x) {
+      if (!x || !x.n) return '<tr><td>' + label + '</td><td>0</td><td>--</td><td>--</td></tr>';
+      return '<tr><td>' + label + '</td><td>' + x.n + '</td><td>' + Math.round(100 * x.win / x.n) + '%</td><td class="' + (x.r >= 0 ? 'up' : 'down') + '">' + (x.r >= 0 ? '+' : '') + x.r.toFixed(1) + 'R</td></tr>';
+    }
+    function group(t) { return '<tr class="g"><th colspan="4">' + t + '</th></tr>'; }
+    var d = bt.byD1 || {}, h = bt.byHours || {}, ty = bt.byType || {};
+    box.innerHTML = '<b>' + sym.label + ', last ' + days + ' days:</b> ' + bt.n + ' calls reached the entry, ' + bt.win + ' hit TP1 first (<b>' + bt.pct + '%</b>). ' +
       'Result <b class="' + (bt.netR >= 0 ? 'up' : 'down') + '">' + (bt.netR >= 0 ? '+' : '') + bt.netR.toFixed(1) + 'R</b>, worst drawdown <b>' + bt.ddR.toFixed(1) + 'R</b>. ' +
       (bt.pf !== null ? 'Profit factor <b>' + bt.pf.toFixed(2) + '</b>. ' : '') +
       (bt.avgWinR !== null && bt.avgLossR !== null ? 'Average win <b>+' + bt.avgWinR.toFixed(2) + 'R</b>, average loss <b>-' + bt.avgLossR.toFixed(2) + 'R</b>. ' : '') +
       (bt.expR !== null ? 'Per call <b class="' + (bt.expR >= 0 ? 'up' : 'down') + '">' + (bt.expR >= 0 ? '+' : '') + bt.expR.toFixed(2) + 'R</b>. ' : '') +
-      'Longest losing streak <b>' + bt.lossRun + '</b>. ' + esc(parts.join(', ')) + '. ' + bt.skipped + ' setups never reached the entry.';
+      'Longest losing streak <b>' + bt.lossRun + '</b>. ' + bt.skipped + ' setups never reached the entry.' +
+      '<table class="bt"><thead><tr><th>SPLIT</th><th>CALLS</th><th>HIT TP1</th><th>RESULT</th></tr></thead><tbody>' +
+      group('BY SETUP') + line('Break and retest', ty.retest) + line('Sweep and reclaim', ty.sweep) + line('Opening-range breakout', ty.orb) +
+      group('BY DAILY TREND') + line('With the daily trend', d.with) + line('Against the daily trend', d.against) + (d.flat && d.flat.n ? line('Daily trend flat', d.flat) : '') +
+      group('BY TIME OF DAY') + line('Busy hours, 13:00 to 19:00', h.busy) + line('Other hours', h.other) +
+      '</tbody></table><p class="read">' + esc(btRead(bt)) + (days < 30 && sym.bin ? ' A week is too short to trust: run the ' + LONG_DAYS + '-day test.' : '') + '</p>';
   }
   function drawChart() {
     var cv = $('chart'), st = S[active], sym = SYMS[active]; if (!st.tf) return;
@@ -1633,14 +1802,17 @@ if (typeof module !== 'undefined') module.exports = IG;
     var id = active, an = S[id].an, v = verdict(id), ac = activeCall(id);
     return {
       market: SYMS[id].label, time_south_africa: hm(new Date(), 'Africa/Johannesburg'), demo_data: S[id].demo, price: an ? an.price : null,
-      trend: an ? { h1: tn(an.h1), m15: tn(an.m15), m5_structure: an.range ? 'range' : an.structure } : null,
+      trend: an ? { daily: an.d1 === null ? 'no data' : tn(an.d1), h1: tn(an.h1), m15: tn(an.m15), m5_structure: an.range ? 'range' : an.structure } : null,
       range: an && an.range ? { high: an.range.hi, low: an.range.lo, minutes: an.range.bars * 5, touches: an.range.touches } : null,
       last_break: an && an.lastBreak ? { direction: tn(an.lastBreak.dir), level: an.lastBreak.level, minutes_ago: Math.round((Date.now() - an.lastBreak.t) / 60000) } : null,
       patterns: an ? an.patterns.map(function (p) { return { name: p.name, status: p.status, neckline: p.neck }; }) : [],
       liquidity_sweep: an && an.sweep ? { side: an.sweep.dir === 1 ? 'low swept' : 'high swept', level: an.sweep.level, flipped: an.sweep.flip } : null,
       order_block: an && an.orderBlock ? { side: an.orderBlock.dir === 1 ? 'buy zone' : 'sell zone', low: an.orderBlock.bot, high: an.orderBlock.top } : null,
       open_fair_value_gaps: an ? an.fvgs.map(function (g) { return { low: g.bot, high: g.top }; }) : [],
-      backtest_last_week: S[id].bt ? { calls: S[id].bt.n, hit_tp1: S[id].bt.win, net_R: S[id].bt.netR } : null,
+      previous_day: an && an.pdh !== null ? { high: an.pdh, low: an.pdl } : null,
+      opening_ranges_today: an ? (an.ranges || []).map(function (o) { return { session: o.name, high: o.hi, low: o.lo, first_break: o.brk ? tn(o.brk.dir) : 'none' }; }) : [],
+      gold_busy_hours_now: an ? an.busy : null,
+      backtest: (S[id].btL || S[id].bt) ? (function (q) { return { days: Math.round(q.hours / 24), calls: q.n, hit_tp1: q.win, net_R: q.netR, by_setup: q.byType, by_daily_trend: q.byD1, by_hours: q.byHours }; })(S[id].btL || S[id].bt) : null,
       rule_based_verdict: v.head, action: v.act, setup: ac ? { kind: ac.type, direction: ac.dir === 1 ? 'buy' : 'sell', entry: ac.entry, stop: ac.sl, tp1: ac.tp1, tp2: ac.tp2, confidence_pct: ac.conf, stage: ac.stage } : null,
       other_markets_30min_change_pct: { gold: chg('XAU', 30), silver: chg('XAG', 30), platinum: chg('XPT', 30), palladium: chg('XPD', 30), bitcoin: chg('BTC', 30) },
       upcoming_us_news: NEWS.filter(function (n) { return n.country === 'USD' && n.impact === 'High' && n.t > Date.now() - 900000; }).slice(0, 4).map(function (n) { return { title: n.title, south_africa_time: hm(new Date(n.t), 'Africa/Johannesburg') }; }),
@@ -1757,6 +1929,7 @@ if (typeof module !== 'undefined') module.exports = IG;
   $('askBtn').addEventListener('click', ask);
   $('askIn').addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); ask(); } });
   $('deepBtn').addEventListener('click', deep);
+  $('btLong').addEventListener('click', function () { runLong(active); });
   $('setBtn').addEventListener('click', function () {
     $('fName').value = CFG.name; $('fVoice').checked = !!CFG.voice; $('fPop').checked = !!CFG.pop; $('fPing').checked = !!CFG.ping; $('fDesk').checked = !!CFG.desk; $('fKey').value = CFG.key; $('fModel').value = CFG.model; $('fBroker').value = '';
     document.querySelector('label[for="fBroker"]').textContent = "YOUR BROKER'S " + SYMS[active].label + ' PRICE RIGHT NOW (OPTIONAL)';
