@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="theme-color" content="#01060C">
+<meta name="ig-build" content="2026-10-11 15:38">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -60,6 +61,7 @@ button{cursor:pointer}
 .sessions span.live{border-color:var(--up);color:var(--up)} .sessions span.soon{border-color:var(--blue);color:var(--blue2)}
 .banner{padding:10px 14px;border:1px dashed var(--warn);color:#FFD9B0;font-family:var(--mono);font-size:13px;background:rgba(255,159,69,.08)}
 .banner[hidden]{display:none}
+.banner.upd{display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between;border-style:solid;border-color:var(--blue);background:rgba(79,209,255,.12);color:#fff}
 
 /* pipeline strip: how the verdict is reached */
 .pipe{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px}
@@ -255,6 +257,7 @@ fieldset.alerts .btn{align-self:flex-start;margin-top:6px}
     <div class="sessions" id="sessions"></div>
   </div>
   <div class="banner" id="banner" hidden></div>
+  <div class="banner upd" id="upd" hidden><span>A newer version of this page is ready.</span> <button class="btn solid" type="button" id="updBtn">UPDATE NOW</button></div>
   <nav class="pipe" id="pipe" aria-label="How the verdict is reached. Select a step to jump to its panel."></nav>
 
   <main class="grid">
@@ -407,7 +410,7 @@ fieldset.alerts .btn{align-self:flex-start;margin-top:6px}
     </section>
   </div>
 
-  <p class="foot">Imagelink reads prices and applies fixed rules. It does not know the future. The confidence score counts how many conditions line up; it is not a win probability. Gold candles come from tokenised gold (PAXG) adjusted to the spot price, so levels can differ from your broker by a small amount. Nothing here is financial advice.</p>
+  <p class="foot">Imagelink reads prices and applies fixed rules. It does not know the future. The confidence score counts how many conditions line up; it is not a win probability. Gold candles come from tokenised gold (PAXG) adjusted to the spot price, so levels can differ from your broker by a small amount. Nothing here is financial advice. <span id="verTxt"></span></p>
 </div>
 
 <dialog id="dlg">
@@ -1785,7 +1788,21 @@ if (typeof module !== 'undefined') module.exports = IG;
     el.classList.remove('flash'); void el.offsetWidth; el.classList.add('flash');
   });
   setInterval(loadContext, 60000);
-  logEv('System loaded');
+
+  /* version: the page checks the server for a newer copy of itself, because browsers keep the old one for a while */
+  var BM = document.querySelector('meta[name="ig-build"]'), BUILD = BM ? BM.getAttribute('content') : '', NEWB = '';
+  setTxt('verTxt', BUILD ? 'Version ' + BUILD + '.' : '');
+  function checkUpdate() {
+    if (!BUILD || !/^https?:/.test(location.protocol) || NEWB) return;
+    fetch(location.pathname + '?t=' + Date.now(), { cache: 'no-store' }).then(function (r) { return r.ok ? r.text() : ''; }).then(function (t) {
+      var m = t.match(/name="ig-build" content="([^"]+)"/);
+      if (m && m[1] !== BUILD) { NEWB = m[1]; $('upd').hidden = false; logEv('A newer version of the page is ready (' + NEWB + ')', 'warn'); }
+    }).catch(function () { /* offline: try again later */ });
+  }
+  $('updBtn').addEventListener('click', function () { location.replace(location.pathname + '?v=' + encodeURIComponent(NEWB.replace(/[^0-9]/g, ''))); });
+  setInterval(checkUpdate, 180000); setTimeout(checkUpdate, 15000);
+  document.addEventListener('visibilitychange', function () { if (!document.hidden) checkUpdate(); });
+  logEv('System loaded' + (BUILD ? ', version ' + BUILD : ''));
 
   document.querySelectorAll('.seg button').forEach(function (b) { b.setAttribute('aria-pressed', b.getAttribute('data-sym') === active ? 'true' : 'false'); });
   tickClock(); setInterval(tickClock, 1000);
